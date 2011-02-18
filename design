@@ -1,6 +1,0 @@
-Packet struct
-
- - byte Flags
- - int Local sequence // if flags == 0
- - int Remote sequence // "" "" "" ""
- - byte[] payload
