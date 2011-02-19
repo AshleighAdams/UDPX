@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Text;
 
 namespace Test
 {
@@ -12,15 +13,32 @@ namespace Test
         [STAThread]
         static void Main()
         {
+            Encoding e = Encoding.ASCII;
+            IUDPXConnection conn = null;
+            ConnectHandler ch = delegate(IUDPXConnection Connection)
+            {
+                if (Connection != null)
+                {
+                    conn = Connection;
+                    conn.ReceivePacket += delegate(byte[] Data)
+                    {
+                        Console.WriteLine(e.GetString(Data));
+                    };
+                }
+            };
 #if DEBUG
-            UDPX.BeginListen(101, null);
+            UDPX.Listen(101, ch);
+#else
+            UDPX.Connect(new IPEndPoint(IPAddress.Loopback, 101), ch);
+#endif
             while (true)
             {
-                System.Threading.Thread.Sleep(100);
+                string message = Console.ReadLine();
+                if (conn != null)
+                {
+                    conn.Send(e.GetBytes(message));
+                }
             }
-#else
-            UDPX.Connect(new IPEndPoint(IPAddress.Loopback, 101), null);
-#endif
         }
     }
 }
