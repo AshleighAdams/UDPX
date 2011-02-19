@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 
 namespace Test
 {
@@ -11,7 +12,15 @@ namespace Test
         [STAThread]
         static void Main()
         {
-
+#if DEBUG
+            UDPX.BeginListen(101, null);
+            while (true)
+            {
+                System.Threading.Thread.Sleep(100);
+            }
+#else
+            UDPX.Connect(new IPEndPoint(IPAddress.Loopback, 101), null);
+#endif
         }
     }
 }
