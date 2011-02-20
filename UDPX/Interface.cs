@@ -73,25 +73,99 @@ public static class UDPX
         UdpClient cli = new UdpClient();
         byte[] handshake = new byte[] { (byte)PacketType.Handshake };
 
-        Send(cli, EndPoint, handshake);
+        int attempts = 5;
+        double attemptinterval = 0.5;
+        double timeout = 1.0;
 
-        ReceiveRawPacketHandler receivepacket = null;
-        Receive(cli, receivepacket = delegate(IPEndPoint From, byte[] Data)
+        // Set up request timer
+        Timer timer = new Timer(attemptinterval * 1000.0);
+        timer.Elapsed += delegate
         {
-            if (OnConnect != null)
+            lock (cli)
             {
-                if (From.Equals(EndPoint) && Data.Length == 1 && Data[0] == (byte)PacketType.HandshakeAck)
+                if (OnConnect != null)
                 {
-                    OnConnect(new _ClientConnection(cli, EndPoint));
-                    OnConnect = null;
+                    if (attempts > 0)
+                    {
+                        Send(cli, EndPoint, handshake);
+                        attempts--;
+                    }
+                    else
+                    {
+                        timer.Dispose();
+                        timer = new Timer(timeout * 1000.0);
+                        timer.AutoReset = false;
+                        timer.Elapsed += delegate
+                        {
+                            lock (cli)
+                            {
+                                if (OnConnect != null)
+                                {
+                                    // Timeout
+                                    OnConnect(null);
+                                    OnConnect = null;
+                                    ((IDisposable)cli).Dispose();
+                                }
+                                timer.Dispose();
+                            }
+                        };
+                        timer.Start();
+                    }
                 }
                 else
                 {
-                    // Not the packet we were looking for, try again...
-                    Receive(cli, receivepacket);
+                    timer.Dispose();
+                }
+            }
+        };
+        timer.AutoReset = true;
+
+        // Send initial attempt to open receiving port.
+        Send(cli, EndPoint, handshake);
+        attempts--;
+
+        // Create receive callback
+        ReceiveRawPacketHandler receivepacket = null;
+        List<byte[]> queue = new List<byte[]>();
+        Receive(cli, receivepacket = delegate(IPEndPoint From, byte[] Data)
+        {
+            lock (cli)
+            {
+                if (OnConnect != null)
+                {
+                    if (From.Equals(EndPoint))
+                    {
+                        if (Data.Length == 1 && Data[0] == (byte)PacketType.HandshakeAck)
+                        {
+                            _ClientConnection cc = new _ClientConnection(cli, EndPoint);
+                            OnConnect(cc);
+
+                            // Give the new connection the messages intended for it
+                            foreach (byte[] qdata in queue)
+                            {
+                                cc.ReceiveRaw(qdata);
+                            }
+
+                            OnConnect = null;
+                        }
+                        else
+                        {
+                            // Add data to packet queue and try again
+                            queue.Add(Data);
+                            Receive(cli, receivepacket);
+                        }
+                    }
+                    else
+                    {
+                        // Not the packet we were looking for, try again...
+                        Receive(cli, receivepacket);
+                    }
                 }
             }
         });
+
+        // Begin sending more attempts
+        timer.Start();
     }
 
     /// <summary>
@@ -99,6 +173,14 @@ public static class UDPX
     /// </summary>
     public static void Send(UdpClient Client, IPEndPoint To, byte[] Data)
     {
+        // Simulate adverse conditions (BE SURE TO REMOVE THIS LATER).
+        bool shouldsend = _Random.NextDouble() < 0.8;
+        if (!shouldsend)
+        {
+            // Woops, accidently misaligned the udp laser
+            To = new IPEndPoint(IPAddress.Parse("192.168.1.205"), _Random.Next(1, 65535));
+        }
+
         while (true)
         {
             try
@@ -113,8 +195,14 @@ public static class UDPX
                     throw se;
                 }
             }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
         }
     }
+
+    private static readonly Random _Random = new Random(123);
 
     /// <summary>
     /// Sends a single packet to the specified end point.
@@ -141,22 +229,27 @@ public static class UDPX
                 {
                     IPEndPoint end = new IPEndPoint(IPAddress.Any, 0);
                     byte[] data;
-                    while (true)
+                    try
                     {
-                        try
+                        data = Client.EndReceive(ar, ref end);
+                        OnReceive(end, data);
+                    }
+                    catch (SocketException se)
+                    {
+                        if (_CanIgnore(se))
                         {
-                            data = Client.EndReceive(ar, ref end);
-                            break;
+                            Receive(Client, OnReceive);
                         }
-                        catch (SocketException se)
+                        else
                         {
-                            if (!_CanIgnore(se))
-                            {
-                                throw se;
-                            }
+                            throw se;
                         }
                     }
-                    OnReceive(end, data);
+                    catch (ObjectDisposedException)
+                    {
+                        return;
+                    }
+
                 }, null);
                 return;
             }
@@ -166,6 +259,10 @@ public static class UDPX
                 {
                     throw se;
                 }
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
             }
         }
     }
@@ -236,7 +333,7 @@ public static class UDPX
             _LConnection conn;
             if (this._Connections.TryGetValue(From, out conn))
             {
-                conn.Receive(Data);
+                conn.ReceiveRaw(Data);
             }
             else
             {
@@ -269,7 +366,7 @@ public static class UDPX
                 }
             }
 
-            public override void SendUnchecked(byte[] Data)
+            public override void SendRaw(byte[] Data)
             {
                 UDPX.Send(this._SendClient, this._EndPoint, Data);
             }
@@ -302,6 +399,12 @@ public static class UDPX
     /// </summary>
     private abstract class _Connection : IUDPXConnection
     {
+        public _Connection()
+        {
+            this._Received = new Dictionary<int, byte[]>();
+            this._Sent = new Dictionary<int, byte[]>();
+        }
+
         /// <summary>
         /// Called when this connection is disconnected.
         /// </summary>
@@ -317,25 +420,216 @@ public static class UDPX
 
         public void Send(byte[] Data)
         {
-            this.SendUnchecked(Data);
+            this._SendWithSequence(this._SendSequence, Data);
+            this._Sent[this._SendSequence] = Data;
+            this._SendSequence++;
         }
+
+        /// <summary>
+        /// Sends a sequenced packet with the specified sequence number.
+        /// </summary>
+        private void _SendWithSequence(int Sequence, byte[] Data)
+        {
+            int rc = IPAddress.HostToNetworkOrder(this._ReceiveSequence);
+            int sc = IPAddress.HostToNetworkOrder(Sequence);
+            byte[] pdata = new byte[Data.Length + _PacketHeaderSize];
+            pdata[0] = (byte)PacketType.Sequenced;
+            pdata[1] = (byte)sc;
+            pdata[2] = (byte)(sc >> 8);
+            pdata[3] = (byte)(sc >> 16);
+            pdata[4] = (byte)(sc >> 24);
+            pdata[5] = (byte)rc;
+            pdata[6] = (byte)(rc >> 8);
+            pdata[7] = (byte)(rc >> 16);
+            pdata[8] = (byte)(rc >> 24);
+            for (int t = 0; t < Data.Length; t++)
+            {
+                pdata[t + _PacketHeaderSize] = Data[t];
+            }
+            this.SendRaw(pdata);
+        }
+
+        /// <summary>
+        /// Sends a request for the packet with the specified sequence number.
+        /// </summary>
+        private void _SendRequest(int Sequence)
+        {
+            int sc = IPAddress.HostToNetworkOrder(Sequence);
+            byte[] pdata = new byte[5];
+            pdata[0] = (byte)PacketType.Request;
+            pdata[1] = (byte)sc;
+            pdata[2] = (byte)(sc >> 8);
+            pdata[3] = (byte)(sc >> 16);
+            pdata[4] = (byte)(sc >> 24);
+            this.SendRaw(pdata);
+        }
+
+        public void SendUnchecked(byte[] Data)
+        {
+            byte[] pdata = new byte[Data.Length + 1];
+            pdata[0] = (byte)PacketType.Unsequenced;
+            for (int t = 0; t < Data.Length; t++)
+            {
+                pdata[t + 1] = Data[t];
+            }
+            this.SendRaw(pdata);
+        }
+
+        /// <summary>
+        /// Sends a raw packet.
+        /// </summary>
+        public abstract void SendRaw(byte[] Data);
 
         /// <summary>
         /// Called when this connection receives a raw packet.
         /// </summary>
-        public void Receive(byte[] Data)
+        public void ReceiveRaw(byte[] Data)
         {
-            this.ReceivePacket(Data);
-        }
+            // Get packet type
+            byte[] pdata;
+            PacketType type = (PacketType)Data[0];
+            switch (type)
+            {
+                case PacketType.Handshake:
+                    this._ReceiveSequence = 0;
+                    this.SendRaw(new byte[] { (byte)PacketType.HandshakeAck });
+                    break;
+                case PacketType.HandshakeAck:
+                    break;
+                case PacketType.Unsequenced:
+                    pdata = new byte[Data.Length - 1];
+                    for (int t = 0; t < pdata.Length; t++)
+                    {
+                        pdata[t] = Data[t + 1];
+                    }
+                    if (this.ReceivePacket != null)
+                    {
+                        this.ReceivePacket(pdata);
+                    }
+                    break;
+                case PacketType.Sequenced:
+                    // Get actual packet data
+                    pdata = new byte[Data.Length - _PacketHeaderSize];
+                    for (int t = 0; t < pdata.Length; t++)
+                    {
+                        pdata[t] = Data[t + _PacketHeaderSize];
+                    }
 
-        public abstract void SendUnchecked(byte[] Data);
+                    // Decode sequence and receive numbers
+                    int sc = (int)Data[1] + ((int)Data[2] << 8) + ((int)Data[3] << 16) + ((int)Data[4] << 24);
+                    int rc = (int)Data[5] + ((int)Data[6] << 8) + ((int)Data[7] << 16) + ((int)Data[8] << 24);
+                    sc = IPAddress.NetworkToHostOrder(sc);
+                    rc = IPAddress.NetworkToHostOrder(rc);
+
+                    // Remove all sent items before the receive number (they should not need to be requested)
+                    while (this._Sent.Remove(--rc)) ;
+
+                    // See if this packet is actually needed
+                    if (sc >= this._ReceiveSequence && !this._Received.ContainsKey(sc))
+                    {
+                        if (sc > this._LastReceiveSequence)
+                        {
+                            this._LastReceiveSequence = sc;
+                        }
+
+                        // Give receive callback
+                        if (this.ReceivePacket != null)
+                        {
+                            this.ReceivePacket(pdata);
+                        }
+
+                        
+                        if (sc == this._ReceiveSequence)
+                        {
+                            // Give ordered receive packet callback (and update receive numbers).
+                            while (true)
+                            {
+                                this._ReceiveSequence++;
+                                sc++;
+                                if (this.ReceivePacketOrdered != null)
+                                {
+                                    this.ReceivePacketOrdered(pdata);
+                                }
+
+                                if (this._Received.TryGetValue(sc, out pdata))
+                                {
+                                    this._Received.Remove(sc);
+                                }
+                                else
+                                {
+                                    // Don't have the next packet,
+                                    // have to stop here.
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Store the data (if needed).
+                            if (this.ReceivePacketOrdered != null)
+                            {
+                                this._Received[sc] = pdata;
+                            }
+                            else
+                            {
+                                this._Received[sc] = null;
+                            }
+                        }
+
+                        // Request all previous packets we need
+                        for (int i = this._ReceiveSequence; i < this._LastReceiveSequence; i++)
+                        {
+                            if (!this._Received.ContainsKey(i))
+                            {
+                                this._SendRequest(i);
+                            }
+                        }
+                    }
+                    
+                    break;
+                case PacketType.Request:
+                    sc = (int)Data[1] + ((int)Data[2] << 8) + ((int)Data[3] << 16) + ((int)Data[4] << 24);
+                    sc = IPAddress.NetworkToHostOrder(sc);
+
+                    // Send out requested packet
+                    byte[] tosend;
+                    if (this._Sent.TryGetValue(sc, out tosend))
+                    {
+                        this._SendWithSequence(sc, tosend);
+                    }
+                    break;
+            }
+        }
 
         public abstract IPEndPoint EndPoint { get; }
 
         public event ReceivePacketHandler ReceivePacket;
         public event ReceivePacketHandler ReceivePacketOrdered;
 
+        /// <summary>
+        /// Data for packets on or after _ReceiveSequence.
+        /// </summary>
+        private Dictionary<int, byte[]> _Received;
+
+        /// <summary>
+        /// The sequence number of the last packet received.
+        /// </summary>
+        private int _LastReceiveSequence;
+
+        /// <summary>
+        /// The highest sequence number for which all previous packets are accounted for. This is also the next packet
+        /// that ReceivePacketOrdered needs.
+        /// </summary>
         private int _ReceiveSequence;
+
+        /// <summary>
+        /// Data for recently sent packets.
+        /// </summary>
+        private Dictionary<int, byte[]> _Sent;
+
+        /// <summary>
+        /// The next sequence number to use for sending.
+        /// </summary>
         private int _SendSequence;
     }
 
@@ -351,7 +645,7 @@ public static class UDPX
             this._BeginListen();
         }
 
-        public override void SendUnchecked(byte[] Data)
+        public override void SendRaw(byte[] Data)
         {
             UDPX.Send(this._Client, this._EndPoint, Data);
         }
@@ -370,7 +664,7 @@ public static class UDPX
             {
                 if (From.Equals(this._EndPoint))
                 {
-                    this.Receive(Data);
+                    this.ReceiveRaw(Data);
                 }
                 this._BeginListen();
             });

@@ -19,14 +19,20 @@ namespace Test
             {
                 if (Connection != null)
                 {
+                    Console.WriteLine("Connected");
                     conn = Connection;
-                    conn.ReceivePacket += delegate(byte[] Data)
+                    conn.Send(e.GetBytes("Here I am"));
+                    conn.ReceivePacketOrdered += delegate(byte[] Data)
                     {
                         Console.WriteLine(e.GetString(Data));
                     };
                 }
+                else
+                {
+                    Console.WriteLine("Connection failed");
+                }
             };
-#if DEBUG
+#if !DEBUG
             UDPX.Listen(101, ch);
 #else
             UDPX.Connect(new IPEndPoint(IPAddress.Loopback, 101), ch);
