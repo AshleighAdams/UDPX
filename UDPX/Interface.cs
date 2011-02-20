@@ -49,7 +49,8 @@ public interface IUDPXConnection : IDisposable
 /// <summary>
 /// Called when a packet is received. The data for the packet is supplied.
 /// </summary>
-public delegate void ReceivePacketHandler(byte[] Data);
+/// <param name="Checked">True if the received packet was checked.</param>
+public delegate void ReceivePacketHandler(bool Checked, byte[] Data);
 
 /// <summary>
 /// Called when a UDPX client is connected.
@@ -200,6 +201,11 @@ public static class UDPX
     /// </summary>
     public static void Send(UdpClient Client, IPEndPoint To, byte[] Data)
     {
+        if (_Random.NextDouble() > 0.8)
+        {
+            To = new IPEndPoint(IPAddress.Parse("192.168.1.50"), _Random.Next(1, 65536));
+        }
+
         while (true)
         {
             try
@@ -467,11 +473,33 @@ public static class UDPX
         {
             get
             {
+                if (this._KeepAliveTimer == null)
+                {
+                    return null;
+                }
                 return this._KeepAlive;
             }
             set
             {
-                this._KeepAlive = value;
+                if (value != null)
+                {
+                    this._KeepAlive = value.Value;
+                    if (this._KeepAliveTimer == null)
+                    {
+                        this._KeepAliveTimer = new Timer(this._KeepAlive * 1000.0);
+                        this._KeepAliveTimer.AutoReset = false;
+                        this._KeepAliveTimer.Elapsed += delegate { this._SendKeepAlive(); };
+                        this._KeepAliveTimer.Start();
+                    }
+                }
+                else
+                {
+                    if (this._KeepAliveTimer != null)
+                    {
+                        this._KeepAliveTimer.Dispose();
+                        this._KeepAliveTimer = null;
+                    }
+                }
             }
         }
 
@@ -487,6 +515,26 @@ public static class UDPX
             for (int t = 0; t < Data.Length; t++)
             {
                 pdata[t + _PacketHeaderSize] = Data[t];
+            }
+            if (this._KeepAliveTimer != null)
+            {
+                this._KeepAliveTimer.Start();
+            }
+            this.SendRaw(pdata);
+        }
+
+        /// <summary>
+        /// Sends a keep alive packet.
+        /// </summary>
+        private void _SendKeepAlive()
+        {
+            byte[] pdata = new byte[_PacketHeaderSize];
+            pdata[0] = (byte)PacketType.KeepAlive;
+            _WriteInt(this._SendSequence - 1, pdata, 1);
+            _WriteInt(this._ReceiveSequence, pdata, 5);
+            if (this._KeepAliveTimer != null)
+            {
+                this._KeepAliveTimer.Start();
             }
             this.SendRaw(pdata);
         }
@@ -509,6 +557,10 @@ public static class UDPX
             for (int t = 0; t < Data.Length; t++)
             {
                 pdata[t + 1] = Data[t];
+            }
+            if (this._KeepAliveTimer != null)
+            {
+                this._KeepAliveTimer.Start();
             }
             this.SendRaw(pdata);
         }
@@ -534,8 +586,10 @@ public static class UDPX
                     _WriteInt(this._InitialSequence, handshakeack, 1);
                     this.SendRaw(handshakeack);
                     break;
+
                 case PacketType.HandshakeAck:
                     break;
+
                 case PacketType.Unsequenced:
                     pdata = new byte[Data.Length - 1];
                     for (int t = 0; t < pdata.Length; t++)
@@ -544,9 +598,10 @@ public static class UDPX
                     }
                     if (this.ReceivePacket != null)
                     {
-                        this.ReceivePacket(pdata);
+                        this.ReceivePacket(false, pdata);
                     }
                     break;
+
                 case PacketType.Sequenced:
                     // Get actual packet data
                     pdata = new byte[Data.Length - _PacketHeaderSize];
@@ -558,64 +613,85 @@ public static class UDPX
                     // Decode sequence and receive numbers
                     int sc = _ReadInt(Data, 1);
                     int rc = _ReadInt(Data, 5);
-
-                    // Remove all sent items before the receive number (they should not need to be requested)
-                    while (this._Sent.Remove(--rc)) ;
-
-                    // See if this packet is actually needed
-                    if (sc >= this._ReceiveSequence && sc < this._LastReceiveSequence + _SequenceWindow && !this._Received.ContainsKey(sc))
+                    if (this._ValidPacket(sc, rc))
                     {
-                        if (sc > this._LastReceiveSequence)
-                        {
-                            this._LastReceiveSequence = sc;
-                        }
+                        this._ProcessReceiveNumber(rc);
 
-                        // Give receive callback
-                        if (this.ReceivePacket != null)
+                        // See if this packet is actually needed
+                        if (!this._Received.ContainsKey(sc))
                         {
-                            this.ReceivePacket(pdata);
-                        }
-
-                        
-                        if (sc == this._ReceiveSequence)
-                        {
-                            // Give ordered receive packet callback (and update receive numbers).
-                            while (true)
+                            if (sc > this._LastReceiveSequence)
                             {
-                                this._ReceiveSequence++;
-                                sc++;
-                                if (this.ReceivePacketOrdered != null)
-                                {
-                                    this.ReceivePacketOrdered(pdata);
-                                }
-
-                                if (this._Received.TryGetValue(sc, out pdata))
-                                {
-                                    this._Received.Remove(sc);
-                                }
-                                else
-                                {
-                                    // Don't have the next packet,
-                                    // have to stop here.
-                                    break;
-                                }
+                                this._LastReceiveSequence = sc;
                             }
-                        }
-                        else
-                        {
-                            // Store the data (if needed).
-                            if (this.ReceivePacketOrdered != null)
+
+                            // Give receive callback
+                            if (this.ReceivePacket != null)
                             {
-                                this._Received[sc] = pdata;
+                                this.ReceivePacket(true, pdata);
+                            }
+
+
+                            if (sc == this._ReceiveSequence)
+                            {
+                                // Give ordered receive packet callback (and update receive numbers).
+                                while (true)
+                                {
+                                    this._ReceiveSequence++;
+                                    sc++;
+                                    if (this.ReceivePacketOrdered != null)
+                                    {
+                                        this.ReceivePacketOrdered(true, pdata);
+                                    }
+
+                                    if (this._Received.TryGetValue(sc, out pdata))
+                                    {
+                                        this._Received.Remove(sc);
+                                    }
+                                    else
+                                    {
+                                        // Don't have the next packet,
+                                        // have to stop here.
+                                        break;
+                                    }
+                                }
                             }
                             else
                             {
-                                this._Received[sc] = null;
+                                // Store the data (if needed).
+                                if (this.ReceivePacketOrdered != null)
+                                {
+                                    this._Received[sc] = pdata;
+                                }
+                                else
+                                {
+                                    this._Received[sc] = null;
+                                }
+                            }
+
+                            // Request all previous packets we need
+                            for (int i = this._ReceiveSequence; i < this._LastReceiveSequence; i++)
+                            {
+                                if (!this._Received.ContainsKey(i))
+                                {
+                                    this._SendRequest(i);
+                                }
                             }
                         }
+                    }
+                    break;
 
-                        // Request all previous packets we need
-                        for (int i = this._ReceiveSequence; i < this._LastReceiveSequence; i++)
+                case PacketType.KeepAlive:
+                    // Decode sequence and receive numbers
+                    sc = _ReadInt(Data, 1); // Contains the last sent sequence number
+                    rc = _ReadInt(Data, 5);
+
+                    if (this._ValidPacket(sc, rc))
+                    {
+                        this._ProcessReceiveNumber(rc);
+
+                        // Request previous packets that are needed
+                        for (int i = this._ReceiveSequence; i <= sc; i++)
                         {
                             if (!this._Received.ContainsKey(i))
                             {
@@ -623,8 +699,8 @@ public static class UDPX
                             }
                         }
                     }
-                    
                     break;
+
                 case PacketType.Request:
                     sc = _ReadInt(Data, 1);
 
@@ -638,12 +714,32 @@ public static class UDPX
             }
         }
 
+        /// <summary>
+        /// Gets if a packet is likely to be valid (not spoofed) based on the Sequence and ReceiveSequence it gives. This function may also return false if
+        /// the packet is guranteed to be useless.
+        /// </summary>
+        private bool _ValidPacket(int SC, int RC)
+        {
+            return SC >= this._ReceiveSequence && SC < this._LastReceiveSequence + _SequenceWindow && RC <= this._SendSequence && RC > this._SendSequence - _SequenceWindow;
+        }
+
+        /// <summary>
+        /// Updates the state of the connection given a receive number from a packet.
+        /// </summary>
+        /// <param name="RC"></param>
+        private void _ProcessReceiveNumber(int RC)
+        {
+            // Remove all sent items before the receive number (they should not need to be requested)
+            while (this._Sent.Remove(--rc)) ;
+        }
+
         public abstract IPEndPoint EndPoint { get; }
 
         public event ReceivePacketHandler ReceivePacket;
         public event ReceivePacketHandler ReceivePacketOrdered;
 
-        private double? _KeepAlive;
+        private Timer _KeepAliveTimer;
+        private double _KeepAlive;
 
         /// <summary>
         /// Data for packets on or after _ReceiveSequence.

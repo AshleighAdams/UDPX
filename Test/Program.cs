@@ -21,8 +21,9 @@ namespace Test
                 {
                     Console.WriteLine("Connected");
                     conn = Connection;
+                    conn.KeepAlive = 5.0;
                     conn.Send(e.GetBytes("Here I am"));
-                    conn.ReceivePacketOrdered += delegate(byte[] Data)
+                    conn.ReceivePacketOrdered += delegate(bool Checked, byte[] Data)
                     {
                         Console.WriteLine(e.GetString(Data));
                     };
