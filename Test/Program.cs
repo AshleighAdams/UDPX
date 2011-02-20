@@ -21,11 +21,23 @@ namespace Test
                 {
                     Console.WriteLine("Connected");
                     conn = Connection;
-                    conn.KeepAlive = 5.0;
+                    conn.KeepAlive = 3.0;
+                    conn.Timeout = 10.0;
                     conn.Send(e.GetBytes("Here I am"));
-                    conn.ReceivePacketOrdered += delegate(bool Checked, byte[] Data)
+                    conn.ReceivedPacketOrdered += delegate(bool Checked, byte[] Data)
                     {
                         Console.WriteLine(e.GetString(Data));
+                    };
+                    conn.Disconnected += delegate(bool Explicit)
+                    {
+                        if (Explicit)
+                        {
+                            Console.WriteLine("Disconnected explicitly");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Disconnected");
+                        }
                     };
                 }
                 else
@@ -53,7 +65,14 @@ namespace Test
                 string message = Console.ReadLine();
                 if (conn != null)
                 {
-                    conn.Send(e.GetBytes(message));
+                    if (message == "quit")
+                    {
+                        conn.Disconnect();
+                    }
+                    else
+                    {
+                        conn.Send(e.GetBytes(message));
+                    }
                 }
             }
         }
