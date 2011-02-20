@@ -217,29 +217,35 @@ public static class UDPX
             {
                 Client.BeginReceive(delegate(IAsyncResult ar)
                 {
-                    IPEndPoint end = new IPEndPoint(IPAddress.Any, 0);
-                    byte[] data;
-                    try
+                    lock (Client)
                     {
-                        data = Client.EndReceive(ar, ref end);
-                        OnReceive(end, data);
-                    }
-                    catch (SocketException se)
-                    {
-                        if (_CanIgnore(se))
+                        IPEndPoint end = new IPEndPoint(IPAddress.Any, 0);
+                        byte[] data;
+                        try
                         {
-                            Receive(Client, OnReceive);
+                            data = Client.EndReceive(ar, ref end);
+                            OnReceive(end, data);
                         }
-                        else
+                        catch (SocketException se)
                         {
-                            throw se;
+                            if (se.SocketErrorCode == SocketError.Shutdown)
+                            {
+                                return;
+                            }
+                            if (_CanIgnore(se))
+                            {
+                                Receive(Client, OnReceive);
+                            }
+                            else
+                            {
+                                throw se;
+                            }
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            return;
                         }
                     }
-                    catch (ObjectDisposedException)
-                    {
-                        return;
-                    }
-
                 }, null);
                 return;
             }
@@ -633,6 +639,11 @@ public static class UDPX
             this._Client = Client;
             this._EndPoint = EndPoint;
             this._BeginListen();
+        }
+
+        public override void Disconnect()
+        {
+            ((IDisposable)this._Client).Dispose();
         }
 
         public override void SendRaw(byte[] Data)
