@@ -32,11 +32,21 @@ namespace Test
                     Console.WriteLine("Connection failed");
                 }
             };
-#if !DEBUG
-            UDPX.Listen(101, ch);
-#else
-            UDPX.Connect(new IPEndPoint(IPAddress.Loopback, 101), ch);
-#endif
+
+            Console.Write("Server(s), Client(c) >> ");
+            char c = Console.ReadKey().KeyChar;
+            Console.WriteLine();
+            if (c == 's')
+            {
+                UDPX.Listen(101, ch);
+            }
+            if (c == 'c')
+            {
+                Console.Write("Endpoint >> ");
+                string endpoint = Console.ReadLine();
+                UDPX.Connect(new IPEndPoint(IPAddress.Parse(endpoint), 101), ch);
+            }
+
             while (true)
             {
                 string message = Console.ReadLine();
