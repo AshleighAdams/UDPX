@@ -173,14 +173,6 @@ public static class UDPX
     /// </summary>
     public static void Send(UdpClient Client, IPEndPoint To, byte[] Data)
     {
-        // Simulate adverse conditions (BE SURE TO REMOVE THIS LATER).
-        bool shouldsend = _Random.NextDouble() < 0.8;
-        if (!shouldsend)
-        {
-            // Woops, accidently misaligned the udp laser
-            To = new IPEndPoint(IPAddress.Parse("192.168.1.205"), _Random.Next(1, 65535));
-        }
-
         while (true)
         {
             try
@@ -201,8 +193,6 @@ public static class UDPX
             }
         }
     }
-
-    private static readonly Random _Random = new Random(123);
 
     /// <summary>
     /// Sends a single packet to the specified end point.
