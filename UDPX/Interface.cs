@@ -27,6 +27,13 @@ public interface IUDPXConnection : IDisposable
     IPEndPoint EndPoint { get; }
 
     /// <summary>
+    /// Gets or sets how after how many seconds of connection inactivity a keep alive packet should be sent. Keep alive packets insure
+    /// that the connection remains open and also help detect missing packets. If this is set to null, no keep alive packets
+    /// are sent.
+    /// </summary>
+    double? KeepAlive { get; set; }
+
+    /// <summary>
     /// Called when a packet is received for this connection. Using this method, packets will not be received in the order
     /// they are sent.
     /// </summary>
@@ -70,8 +77,14 @@ public static class UDPX
     /// </summary>
     public static void Connect(IPEndPoint EndPoint, ConnectHandler OnConnect)
     {
+        // Create sequence number
+        int seq = _CreateInitialSequence();
+        byte[] handshake = new byte[5];
+        handshake[0] = (byte)PacketType.Handshake;
+        _WriteInt(seq, handshake, 1);
+
+
         UdpClient cli = new UdpClient();
-        byte[] handshake = new byte[] { (byte)PacketType.Handshake };
 
         int attempts = 5;
         double attemptinterval = 0.5;
@@ -135,9 +148,10 @@ public static class UDPX
                 {
                     if (From.Equals(EndPoint))
                     {
-                        if (Data.Length == 1 && Data[0] == (byte)PacketType.HandshakeAck)
+                        if (Data.Length == 5 && Data[0] == (byte)PacketType.HandshakeAck)
                         {
-                            _ClientConnection cc = new _ClientConnection(cli, EndPoint);
+                            int recvseq = _ReadInt(Data, 1);
+                            _ClientConnection cc = new _ClientConnection(seq, recvseq, cli, EndPoint);
                             OnConnect(cc);
 
                             // Give the new connection the messages intended for it
@@ -166,6 +180,19 @@ public static class UDPX
 
         // Begin sending more attempts
         timer.Start();
+    }
+
+    /// <summary>
+    /// Random number generator for intial sequence numbers.
+    /// </summary>
+    private static Random _Random = new Random();
+
+    /// <summary>
+    /// Creates a good, random, initial sequence number.
+    /// </summary>
+    private static int _CreateInitialSequence()
+    {
+        return _Random.Next(int.MinValue, 0);
     }
 
     /// <summary>
@@ -333,10 +360,16 @@ public static class UDPX
             }
             else
             {
-                if (Data.Length == 1 && Data[0] == (byte)PacketType.Handshake)
+                if (Data.Length == 5 && Data[0] == (byte)PacketType.Handshake)
                 {
-                    Send(this._Client, From, new byte[] { (byte)PacketType.HandshakeAck });
-                    _LConnection connection = new _LConnection(From, this, this._Client);
+                    int seq = _CreateInitialSequence();
+                    int recvseq = _ReadInt(Data, 1);
+                    byte[] handshakeack = new byte[5];
+                    handshakeack[0] = (byte)PacketType.HandshakeAck;
+                    _WriteInt(seq, handshakeack, 1);
+
+                    Send(this._Client, From, handshakeack);
+                    _LConnection connection = new _LConnection(seq, recvseq, From, this, this._Client);
                     this._Connections[From] = connection;
                     this._OnConnect(connection);
                 }
@@ -347,7 +380,8 @@ public static class UDPX
         
         private class _LConnection : _Connection
         {
-            public _LConnection(IPEndPoint EndPoint, Listener Listener, UdpClient SendClient)
+            public _LConnection(int InitialSequence, int InitialReceiveSequence, IPEndPoint EndPoint, Listener Listener, UdpClient SendClient)
+                : base(InitialSequence, InitialReceiveSequence)
             {
                 this._EndPoint = EndPoint;
                 this._SendClient = SendClient;
@@ -395,11 +429,19 @@ public static class UDPX
     /// </summary>
     private abstract class _Connection : IUDPXConnection
     {
-        public _Connection()
+        public _Connection(int InitialSequence, int InitialReceiveSequence)
         {
             this._Received = new Dictionary<int, byte[]>();
             this._Sent = new Dictionary<int, byte[]>();
+
+            this._ReceiveSequence = this._LastReceiveSequence = InitialReceiveSequence;
+            this._SendSequence = this._InitialSequence = InitialSequence;
         }
+
+        /// <summary>
+        /// Gets how many sequence numbers off an incoming packet can be before it is disregarded.
+        /// </summary>
+        private const int _SequenceWindow = 128;
 
         /// <summary>
         /// Called when this connection is disconnected.
@@ -421,23 +463,27 @@ public static class UDPX
             this._SendSequence++;
         }
 
+        public double? KeepAlive
+        {
+            get
+            {
+                return this._KeepAlive;
+            }
+            set
+            {
+                this._KeepAlive = value;
+            }
+        }
+
         /// <summary>
         /// Sends a sequenced packet with the specified sequence number.
         /// </summary>
         private void _SendWithSequence(int Sequence, byte[] Data)
         {
-            int rc = IPAddress.HostToNetworkOrder(this._ReceiveSequence);
-            int sc = IPAddress.HostToNetworkOrder(Sequence);
             byte[] pdata = new byte[Data.Length + _PacketHeaderSize];
             pdata[0] = (byte)PacketType.Sequenced;
-            pdata[1] = (byte)sc;
-            pdata[2] = (byte)(sc >> 8);
-            pdata[3] = (byte)(sc >> 16);
-            pdata[4] = (byte)(sc >> 24);
-            pdata[5] = (byte)rc;
-            pdata[6] = (byte)(rc >> 8);
-            pdata[7] = (byte)(rc >> 16);
-            pdata[8] = (byte)(rc >> 24);
+            _WriteInt(Sequence, pdata, 1);
+            _WriteInt(this._ReceiveSequence, pdata, 5);
             for (int t = 0; t < Data.Length; t++)
             {
                 pdata[t + _PacketHeaderSize] = Data[t];
@@ -450,13 +496,9 @@ public static class UDPX
         /// </summary>
         private void _SendRequest(int Sequence)
         {
-            int sc = IPAddress.HostToNetworkOrder(Sequence);
             byte[] pdata = new byte[5];
             pdata[0] = (byte)PacketType.Request;
-            pdata[1] = (byte)sc;
-            pdata[2] = (byte)(sc >> 8);
-            pdata[3] = (byte)(sc >> 16);
-            pdata[4] = (byte)(sc >> 24);
+            _WriteInt(Sequence, pdata, 1);
             this.SendRaw(pdata);
         }
 
@@ -487,8 +529,10 @@ public static class UDPX
             switch (type)
             {
                 case PacketType.Handshake:
-                    this._ReceiveSequence = 0;
-                    this.SendRaw(new byte[] { (byte)PacketType.HandshakeAck });
+                    byte[] handshakeack = new byte[5];
+                    handshakeack[0] = (byte)PacketType.HandshakeAck;
+                    _WriteInt(this._InitialSequence, handshakeack, 1);
+                    this.SendRaw(handshakeack);
                     break;
                 case PacketType.HandshakeAck:
                     break;
@@ -512,16 +556,14 @@ public static class UDPX
                     }
 
                     // Decode sequence and receive numbers
-                    int sc = (int)Data[1] + ((int)Data[2] << 8) + ((int)Data[3] << 16) + ((int)Data[4] << 24);
-                    int rc = (int)Data[5] + ((int)Data[6] << 8) + ((int)Data[7] << 16) + ((int)Data[8] << 24);
-                    sc = IPAddress.NetworkToHostOrder(sc);
-                    rc = IPAddress.NetworkToHostOrder(rc);
+                    int sc = _ReadInt(Data, 1);
+                    int rc = _ReadInt(Data, 5);
 
                     // Remove all sent items before the receive number (they should not need to be requested)
                     while (this._Sent.Remove(--rc)) ;
 
                     // See if this packet is actually needed
-                    if (sc >= this._ReceiveSequence && !this._Received.ContainsKey(sc))
+                    if (sc >= this._ReceiveSequence && sc < this._LastReceiveSequence + _SequenceWindow && !this._Received.ContainsKey(sc))
                     {
                         if (sc > this._LastReceiveSequence)
                         {
@@ -584,8 +626,7 @@ public static class UDPX
                     
                     break;
                 case PacketType.Request:
-                    sc = (int)Data[1] + ((int)Data[2] << 8) + ((int)Data[3] << 16) + ((int)Data[4] << 24);
-                    sc = IPAddress.NetworkToHostOrder(sc);
+                    sc = _ReadInt(Data, 1);
 
                     // Send out requested packet
                     byte[] tosend;
@@ -601,6 +642,8 @@ public static class UDPX
 
         public event ReceivePacketHandler ReceivePacket;
         public event ReceivePacketHandler ReceivePacketOrdered;
+
+        private double? _KeepAlive;
 
         /// <summary>
         /// Data for packets on or after _ReceiveSequence.
@@ -627,6 +670,26 @@ public static class UDPX
         /// The next sequence number to use for sending.
         /// </summary>
         private int _SendSequence;
+
+        /// <summary>
+        /// The first sequence number used for sending.
+        /// </summary>
+        private int _InitialSequence;
+    }
+
+    private static void _WriteInt(int Int, byte[] Data, int Offset)
+    {
+        Int = IPAddress.HostToNetworkOrder(Int);
+        Data[Offset + 0] = (byte)Int;
+        Data[Offset + 1] = (byte)(Int >> 8);
+        Data[Offset + 2] = (byte)(Int >> 16);
+        Data[Offset + 3] = (byte)(Int >> 24);
+    }
+
+    private static int _ReadInt(byte[] Data, int Offset)
+    {
+        int Int = (int)Data[Offset + 0] + ((int)Data[Offset + 1] << 8) + ((int)Data[Offset + 2] << 16) + ((int)Data[Offset + 3] << 24);
+        return IPAddress.NetworkToHostOrder(Int);
     }
 
     /// <summary>
@@ -634,7 +697,8 @@ public static class UDPX
     /// </summary>
     private class _ClientConnection : _Connection
     {
-        public _ClientConnection(UdpClient Client, IPEndPoint EndPoint)
+        public _ClientConnection(int InitialSequence, int InitialReceiveSequence, UdpClient Client, IPEndPoint EndPoint)
+            : base(InitialSequence, InitialReceiveSequence)
         {
             this._Client = Client;
             this._EndPoint = EndPoint;
@@ -689,6 +753,7 @@ public static class UDPX
         Unsequenced,
         Request,
         Handshake,
-        HandshakeAck
+        HandshakeAck,
+        KeepAlive
     }
 }
