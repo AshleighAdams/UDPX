@@ -20,6 +20,9 @@ Global
 		{B8829449-A1F0-41CC-BD7C-E0A57125D324}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B8829449-A1F0-41CC-BD7C-E0A57125D324}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
+	GlobalSection(MonoDevelopProperties) = preSolution
+		StartupItem = Test\Test.csproj
+	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection

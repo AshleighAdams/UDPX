@@ -13,6 +13,12 @@ namespace Test
         [STAThread]
         static void Main()
         {
+			ByteSteamWriter w = new ByteSteamWriter();
+			w.WriteByte(123);
+			w.WriteInt(500);
+			w.WriteString("ABC");
+			byte[] result = w.GetBytes();
+			
             Encoding e = Encoding.ASCII;
             IUDPXConnection conn = null;
             ConnectHandler ch = delegate(IUDPXConnection Connection)
@@ -50,6 +56,11 @@ namespace Test
             while (true)
             {
                 string message = Console.ReadLine();
+				if(message == "dos")
+				{
+					for( int i = 0; i < 100000; i++ )
+						conn.Send(e.GetBytes("Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message "), 1);
+				}
                 if (conn != null)
                 {
                     conn.Send(e.GetBytes(message));
