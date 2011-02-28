@@ -86,54 +86,54 @@ public class ByteSteamWriter : IByteStreamWriter
 	
 	public void WriteShort(short Val)
 	{
-		this.WriteByte((byte)(Val << BS2));
-		this.WriteByte((byte)(Val << BS1));
+		this.WriteByte((byte)(Val >> BS1));
+		this.WriteByte((byte)(Val));
 	}
 	
 	public void WriteUShort(ushort Val)
 	{
-		this.WriteByte((byte)(Val << BS2));
-		this.WriteByte((byte)(Val << BS1));
+		this.WriteByte((byte)(Val >> BS1));
+		this.WriteByte((byte)(Val));
 	}
 	
 	public void WriteInt(int Val)
 	{
-		this.WriteByte((byte)(Val << BS4));
-		this.WriteByte((byte)(Val << BS3));
-		this.WriteByte((byte)(Val << BS2));
-		this.WriteByte((byte)(Val << BS1));
+		this.WriteByte((byte)(Val >> BS3));
+		this.WriteByte((byte)(Val >> BS2));
+		this.WriteByte((byte)(Val >> BS1));
+		this.WriteByte((byte)(Val));
 	}
 	
 	public void WriteUInt(uint Val)
 	{
-		this.WriteByte((byte)(Val << BS4));
-		this.WriteByte((byte)(Val << BS3));
-		this.WriteByte((byte)(Val << BS2));
-		this.WriteByte((byte)(Val << BS1));
+		this.WriteByte((byte)(Val >> BS3));
+		this.WriteByte((byte)(Val >> BS2));
+		this.WriteByte((byte)(Val >> BS1));
+		this.WriteByte((byte)(Val));
 	}
 	
 	public void WriteLong(long Val)
 	{
-		this.WriteByte((byte)(Val << BS8));
-		this.WriteByte((byte)(Val << BS7));
-		this.WriteByte((byte)(Val << BS6));
-		this.WriteByte((byte)(Val << BS5));
-		this.WriteByte((byte)(Val << BS4));
-		this.WriteByte((byte)(Val << BS3));
-		this.WriteByte((byte)(Val << BS2));
-		this.WriteByte((byte)(Val << BS1));
+		this.WriteByte((byte)(Val >> BS7));
+		this.WriteByte((byte)(Val >> BS6));
+		this.WriteByte((byte)(Val >> BS5));
+		this.WriteByte((byte)(Val >> BS4));
+		this.WriteByte((byte)(Val >> BS3));
+		this.WriteByte((byte)(Val >> BS2));
+		this.WriteByte((byte)(Val >> BS1));
+		this.WriteByte((byte)(Val));
 	}
 	
 	public void WriteULong(ulong Val)
 	{
-		this.WriteByte((byte)(Val << BS8));
-		this.WriteByte((byte)(Val << BS7));
-		this.WriteByte((byte)(Val << BS6));
-		this.WriteByte((byte)(Val << BS5));
-		this.WriteByte((byte)(Val << BS4));
-		this.WriteByte((byte)(Val << BS3));
-		this.WriteByte((byte)(Val << BS2));
-		this.WriteByte((byte)(Val << BS1));
+		this.WriteByte((byte)(Val >> BS7));
+		this.WriteByte((byte)(Val >> BS6));
+		this.WriteByte((byte)(Val >> BS5));
+		this.WriteByte((byte)(Val >> BS4));
+		this.WriteByte((byte)(Val >> BS3));
+		this.WriteByte((byte)(Val >> BS2));
+		this.WriteByte((byte)(Val >> BS1));
+		this.WriteByte((byte)(Val));
 	}
 	
 	public void WriteString(string Val)

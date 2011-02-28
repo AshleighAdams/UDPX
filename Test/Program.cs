@@ -19,6 +19,11 @@ namespace Test
 			w.WriteString("ABC");
 			byte[] result = w.GetBytes();
 			
+			ByteSteamReader r = new ByteSteamReader(result);
+			byte a = r.ReadByte();
+			int b = r.ReadInt();
+			string cc = r.ReadString();
+			
             Encoding e = Encoding.ASCII;
             IUDPXConnection conn = null;
             ConnectHandler ch = delegate(IUDPXConnection Connection)

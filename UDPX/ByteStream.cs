@@ -28,7 +28,7 @@ public interface IByteStreamWriter
 public interface IByteStreamReader
 {
 	byte ReadByte();
-	byte[] ReadBytes();
+	byte[] ReadBytes(int Length);
 	
 	bool ReadBool();
 	
@@ -40,6 +40,7 @@ public interface IByteStreamReader
 	ulong ReadULong();
 	
 	string ReadString();
+	string ReadWString();
 	
 	int BytesAvailible { get; }
 }
