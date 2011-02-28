@@ -32,10 +32,23 @@ namespace Test
                 {
                     Console.WriteLine("Connected");
                     conn = Connection;
+                    conn.KeepAlive = 3.0;
+                    conn.Timeout = 10.0;
                     conn.Send(e.GetBytes("Here I am"));
-                    conn.ReceivePacketOrdered += delegate(byte[] Data)
+                    conn.ReceivedPacketOrdered += delegate(bool Checked, byte[] Data)
                     {
                         Console.WriteLine(e.GetString(Data));
+                    };
+                    conn.Disconnected += delegate(bool Explicit)
+                    {
+                        if (Explicit)
+                        {
+                            Console.WriteLine("Disconnected explicitly");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Disconnected");
+                        }
                     };
                 }
                 else
@@ -61,14 +74,16 @@ namespace Test
             while (true)
             {
                 string message = Console.ReadLine();
-				if(message == "dos")
-				{
-					for( int i = 0; i < 100000; i++ )
-						conn.Send(e.GetBytes("Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message Big Message "), 1);
-				}
                 if (conn != null)
                 {
-                    conn.Send(e.GetBytes(message));
+                    if (message == "quit")
+                    {
+                        conn.Disconnect();
+                    }
+                    else
+                    {
+                        conn.Send(e.GetBytes(message));
+                    }
                 }
             }
         }
