@@ -13,18 +13,6 @@ namespace Test
         [STAThread]
         static void Main()
         {
-			MemoryByteSteamWriter w = new MemoryByteSteamWriter();
-			w.WriteByte(123);
-			w.WriteInt(500);
-			w.WriteShort(-100);
-			w.WriteString("ABC");
-			byte[] result = w.GetBytes();
-			
-			MemoryByteSteamReader r = new MemoryByteSteamReader(result);
-			byte a = r.ReadByte();
-			int b = r.ReadInt();
-			string cc = r.ReadString();
-			
             Encoding e = Encoding.ASCII;
             IUDPXConnection conn = null;
             ConnectHandler ch = delegate(IUDPXConnection Connection)

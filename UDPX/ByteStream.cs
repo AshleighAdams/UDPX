@@ -28,63 +28,61 @@ public abstract class ByteStreamWriter
 	public virtual void WriteBool(bool Val)
 	{
 		if(Val)
-		{
 			this.WriteByte(1);
-		}else{
+		else
 			this.WriteByte(0);
-		}
 	}
 	
 	public virtual void WriteShort(short Val)
 	{
-		this.WriteByte((byte)(Val >> BS1));
 		this.WriteByte((byte)(Val));
+        this.WriteByte((byte)(Val >> BS1));
 	}
 	
 	public virtual void WriteUShort(ushort Val)
 	{
-		this.WriteByte((byte)(Val >> BS1));
 		this.WriteByte((byte)(Val));
+        this.WriteByte((byte)(Val >> BS1));
 	}
 	
 	public virtual void WriteInt(int Val)
 	{
-		this.WriteByte((byte)(Val >> BS3));
-		this.WriteByte((byte)(Val >> BS2));
+        this.WriteByte((byte)(Val));
 		this.WriteByte((byte)(Val >> BS1));
-		this.WriteByte((byte)(Val));
+		this.WriteByte((byte)(Val >> BS2));
+		this.WriteByte((byte)(Val >> BS3));
 	}
 	
 	public virtual void WriteUInt(uint Val)
 	{
-		this.WriteByte((byte)(Val >> BS3));
-		this.WriteByte((byte)(Val >> BS2));
-		this.WriteByte((byte)(Val >> BS1));
-		this.WriteByte((byte)(Val));
+        this.WriteByte((byte)(Val));
+        this.WriteByte((byte)(Val >> BS1));
+        this.WriteByte((byte)(Val >> BS2));
+        this.WriteByte((byte)(Val >> BS3));
 	}
 	
 	public virtual void WriteLong(long Val)
 	{
-		this.WriteByte((byte)(Val >> BS7));
-		this.WriteByte((byte)(Val >> BS6));
-		this.WriteByte((byte)(Val >> BS5));
-		this.WriteByte((byte)(Val >> BS4));
-		this.WriteByte((byte)(Val >> BS3));
-		this.WriteByte((byte)(Val >> BS2));
+        this.WriteByte((byte)(Val));
 		this.WriteByte((byte)(Val >> BS1));
-		this.WriteByte((byte)(Val));
+		this.WriteByte((byte)(Val >> BS2));
+		this.WriteByte((byte)(Val >> BS3));
+		this.WriteByte((byte)(Val >> BS4));
+		this.WriteByte((byte)(Val >> BS5));
+		this.WriteByte((byte)(Val >> BS6));
+		this.WriteByte((byte)(Val >> BS7));
 	}
 	
 	public virtual void WriteULong(ulong Val)
 	{
-		this.WriteByte((byte)(Val >> BS7));
-		this.WriteByte((byte)(Val >> BS6));
-		this.WriteByte((byte)(Val >> BS5));
-		this.WriteByte((byte)(Val >> BS4));
-		this.WriteByte((byte)(Val >> BS3));
-		this.WriteByte((byte)(Val >> BS2));
-		this.WriteByte((byte)(Val >> BS1));
-		this.WriteByte((byte)(Val));
+        this.WriteByte((byte)(Val));
+        this.WriteByte((byte)(Val >> BS1));
+        this.WriteByte((byte)(Val >> BS2));
+        this.WriteByte((byte)(Val >> BS3));
+        this.WriteByte((byte)(Val >> BS4));
+        this.WriteByte((byte)(Val >> BS5));
+        this.WriteByte((byte)(Val >> BS6));
+        this.WriteByte((byte)(Val >> BS7));
 	}
 	
 	public virtual void WriteString(string Val)
@@ -136,66 +134,60 @@ public abstract class ByteStreamReader
 	
 	public virtual short ReadShort()
 	{
-		short total = 0;
-		total += (short)(this.ReadByte() << BS1);
-		total += (short)(this.ReadByte());
-		return total;
+        short a = (short)(this.ReadByte());
+        short b = (short)(this.ReadByte() << BS1);
+		return (short)(a | b);
 	}
 	
 	public virtual ushort ReadUShort()
 	{
-		ushort total = 0;
-		total += (ushort)(this.ReadByte() << BS1);
-		total += (ushort)(this.ReadByte());
-		return total;
+        ushort a = (ushort)(this.ReadByte());
+        ushort b = (ushort)(this.ReadByte() << BS1);
+        return (ushort)(a | b);
 	}
 	
 	public virtual int ReadInt()
 	{
-		int total = 0;
-		total += this.ReadByte() << BS3;
-		total += this.ReadByte() << BS2;
-		total += this.ReadByte() << BS1;
-		total += this.ReadByte();
-		return total;
+        int a = this.ReadByte();
+        int b = this.ReadByte() << BS1;
+        int c = this.ReadByte() << BS2;
+        int d = this.ReadByte() << BS3;
+        return a | b | c | d;
 	}
 	
 	public virtual uint ReadUInt()
 	{
-		uint total = 0;
-		total += (uint)(this.ReadByte() << BS3);
-		total += (uint)(this.ReadByte() << BS2);
-		total += (uint)(this.ReadByte() << BS1);
-		total += (uint)(this.ReadByte());
-		return total;
+        uint a = (uint)(this.ReadByte());
+        uint b = (uint)(this.ReadByte() << BS1);
+        uint c = (uint)(this.ReadByte() << BS2);
+        uint d = (uint)(this.ReadByte() << BS3);
+        return a | b | c | d;
 	}
 	
 	public virtual long ReadLong()
 	{
-		long total = 0;
-		total += (long)(this.ReadByte() << BS7);
-		total += (long)(this.ReadByte() << BS6);
-		total += (long)(this.ReadByte() << BS5);
-		total += (long)(this.ReadByte() << BS4);
-		total += (long)(this.ReadByte() << BS3);
-		total += (long)(this.ReadByte() << BS2);
-		total += (long)(this.ReadByte() << BS1);
-		total += (long)(this.ReadByte());
-		return total;
+        long a = (long)(this.ReadByte());
+        long b = (long)(this.ReadByte() << BS1);
+        long c = (long)(this.ReadByte() << BS2);
+        long d = (long)(this.ReadByte() << BS3);
+        long e = (long)(this.ReadByte() << BS4);
+        long f = (long)(this.ReadByte() << BS5);
+        long g = (long)(this.ReadByte() << BS6);
+        long h = (long)(this.ReadByte() << BS7);
+        return a | b | c | d | e | f | g | h;
 	}
 	
 	public virtual ulong ReadULong()
 	{
-		ulong total = 0;
-		total += (ulong)(this.ReadByte() << BS7);
-		total += (ulong)(this.ReadByte() << BS6);
-		total += (ulong)(this.ReadByte() << BS5);
-		total += (ulong)(this.ReadByte() << BS4);
-		total += (ulong)(this.ReadByte() << BS3);
-		total += (ulong)(this.ReadByte() << BS2);
-		total += (ulong)(this.ReadByte() << BS1);
-		total += (ulong)(this.ReadByte());
-		return total;
+        ulong a = (ulong)(this.ReadByte());
+        ulong b = (ulong)(this.ReadByte() << BS1);
+        ulong c = (ulong)(this.ReadByte() << BS2);
+        ulong d = (ulong)(this.ReadByte() << BS3);
+        ulong e = (ulong)(this.ReadByte() << BS4);
+        ulong f = (ulong)(this.ReadByte() << BS5);
+        ulong g = (ulong)(this.ReadByte() << BS6);
+        ulong h = (ulong)(this.ReadByte() << BS7);
+        return a | b | c | d | e | f | g | h;
 	}
 	
 	public virtual string ReadString()
