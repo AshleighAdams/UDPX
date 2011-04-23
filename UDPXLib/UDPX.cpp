@@ -59,14 +59,6 @@ namespace UDPX
 	}
 
 
-	
-
-
-
-
-
-
-
 
 	Socket::Socket()
 	{
@@ -162,9 +154,11 @@ namespace UDPX
 	}
 	void UDPXConnection::SetKeepAlive(double Time)
 	{
+		this->m_KeepAlive = Time;
 	}
 	void UDPXConnection::SetTimeout(double Time)
 	{
+		this->m_Timeout = Time;
 	}
 	void UDPXConnection::SetDisconnectEvent(DisconnectedFn fp)
 	{
@@ -177,14 +171,6 @@ namespace UDPX
 		return this->m_pAddress;
 	}
 
-	/*
-private:
-	DisconnectedFn		m_pDisconnected;
-	ReceivedPacketFn	m_ReceivedPacket;
-	double				m_KeepAlive;
-	double				m_Timeout;
-	UDPXAddress*		m_pAddress;
-	*/
 
 	
 	bool Listen(int Port, ConnectionHandelerFn connection)
