@@ -13,6 +13,8 @@
 #include <winsock2.h>
 #include "UDPX.h"
 #include <iostream>
+#include <time.h>
+#include <limits.h>
 #include "windows.h"
 
 using std::cout;
@@ -23,6 +25,17 @@ using namespace UDPX;
 
 namespace UDPX
 {
+	// Private
+	void _WriteInt(int Val, BYTE* Data, int Offset)
+    {
+        Val = (int)htonl(Val);
+        Data[Offset + 0] = (byte)Val;
+        Data[Offset + 1] = (byte)(Val >> 8);
+        Data[Offset + 2] = (byte)(Val >> 16);
+        Data[Offset + 3] = (byte)(Val >> 24);
+    }
+	
+	// Public
 	bool InitSockets()
 	{
 		WSADATA WsaData;
@@ -91,10 +104,10 @@ namespace UDPX
 	  closesocket(this->handle);
 	}
 
-	bool Socket::Send(const UDPXAddress& destination, const char* data, int size)
+	bool Socket::Send(UDPXAddress* destination, const char* data, int size)
 	{
-		unsigned int dest_addr = destination.GetAddress();
-		unsigned short dest_port = destination.GetPort();
+		unsigned int dest_addr = destination->GetAddress();
+		unsigned short dest_port = destination->GetPort();
 
 		sockaddr_in address;
 		address.sin_family = AF_INET;
@@ -111,7 +124,7 @@ namespace UDPX
 		return true;
 	}
 
-	int Socket::Receive(UDPXAddress& sender, void* data, int size)
+	int Socket::Receive(UDPXAddress* sender, void* data, int size)
 	{
 		typedef int socklen_t;
 		socklen_t fromLength = sizeof(sockaddr_in);
@@ -124,7 +137,7 @@ namespace UDPX
 			WSAErr();
 			return -1;
 		}
-		sender = UDPXAddress(pAddr.sin_addr.s_addr,pAddr.sin_port);//seeing as there are no set methods...
+		sender = new UDPXAddress(pAddr.sin_addr.s_addr,pAddr.sin_port);//seeing as there are no set methods...
 		return received_bytes;
 	}
 
@@ -173,14 +186,109 @@ namespace UDPX
 
 
 	
-	bool Listen(int Port, ConnectionHandelerFn connection)
+	void Listen(int Port, ConnectionHandelerFn connection)
 	{
 		
 	}
-
-	bool Connect(UDPXAddress* Address)
+	
+	struct ConnectThreadArugments
 	{
+		UDPXAddress* Address;
+		ConnectionHandelerFn ConnectionHandeler;
+	};
+	typedef struct PacketQueue
+	{
+		BYTE* Data;
+		int Length;
+		PacketQueue* Next;
+	};
+
+	
+	DWORD WINAPI ConnectThread(void* arg)
+	{
+		ConnectThreadArugments* args = (ConnectThreadArugments*)arg;
+		UDPXAddress* Address = args->Address;
+		ConnectionHandelerFn connection = args->ConnectionHandeler;
+		free(args); // we don't need you anymore
+
+		srand(time(NULL));
+		int startsequence = INT_MIN + rand();
 		
+		BYTE pdata[5];
+		pdata[0] = PacketType::Handshake;
+		_WriteInt(startsequence, pdata, 1);
+		
+		Socket s;
+		int Attempts = 5;
+		double Timeout = 1.0;
+
+		PacketQueue* FirstNode = NULL;
+		PacketQueue* LastestNode = NULL;
+		
+		while(Attempts >= 0)
+		{
+			s.Send(Address, (const char*)pdata, 5);
+			--Attempts;
+			
+			while(true)
+			{
+				BYTE packet[UDPX_MAXPACKETSIZE];
+				UDPXAddress* Sender;
+				int recived = s.Receive(Sender, packet, UDPX_MAXPACKETSIZE);
+				if(Sender->GetAddress() == Address->GetAddress() && Sender->GetPort() == Address->GetPort()) // make sure it's from the correct person.
+				{
+					if(recived == -1) break;
+					if(recived == 5 && packet[0] == PacketType::HandshakeAck)
+					{
+						// Do recive stuff
+						PacketQueue* Node = FirstNode;
+						while(Node)
+						{
+							// Do stuff with node->data
+							PacketQueue* LastNode = Node;
+							Node = Node->Next;
+							free(LastNode);
+						}
+					}
+					else
+					{
+						PacketQueue* Node = new PacketQueue();
+						Node->Data = packet;
+						Node->Length = recived;
+						Node->Next = NULL;
+						if(!FirstNode)
+						{
+							FirstNode = Node;
+							LastestNode = Node;
+						}
+						else
+						{
+							LastestNode->Next = Node;
+							LastestNode = Node;
+						}
+					}
+				}
+			}
+		}
+		if(FirstNode) // Lets free any data there may have been
+		{
+			PacketQueue* Node = FirstNode;
+			while(Node)
+			{
+				PacketQueue* LastNode = Node;
+				Node = Node->Next;
+				free(LastNode);
+			}
+		}
+	}
+
+	void Connect(UDPXAddress* Address, ConnectionHandelerFn connection)
+	{
+		ConnectThreadArugments arg;
+		arg.Address = Address;
+		arg.ConnectionHandeler = connection;
+
+		CreateThread(NULL,NULL,ConnectThread,&arg,NULL,NULL);
 	}
 }
 

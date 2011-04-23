@@ -8,9 +8,20 @@
 
 namespace UDPX
 {
+	enum PacketType : BYTE
+    {
+        Sequenced,
+        Unsequenced,
+        Request,
+        Handshake,
+        HandshakeAck,
+        KeepAlive,
+        Disconnect
+    };
+
 	bool InitSockets();
 	void UninitSockets();
-	
+
 	class UDPXAddress
 	{
 	public:
@@ -33,11 +44,15 @@ namespace UDPX
 		Socket();
 		bool Open(unsigned short port);
 		void Close();
-		bool Send(const UDPXAddress& destination, const char* data, int size);
-		int Receive(UDPXAddress& sender, void* data, int size);
+		bool Send(UDPXAddress* destination, const char* data, int size);
+		int Receive(UDPXAddress* sender, void* data, int size);
 	private:
 		SOCKET handle;
 	};
+
+	void Send(Socket* s, UDPXAddress* address, BYTE data, int length)
+	{
+	}
 	
 	class UDPXConnection
 	{
@@ -64,8 +79,8 @@ namespace UDPX
 
 
 	typedef void (__stdcall *ConnectionHandelerFn)(UDPXConnection Connection);
-	bool Listen(int port, ConnectionHandelerFn connection);
-	bool Connect(UDPXAddress* Address);
+	void Listen(int port, ConnectionHandelerFn connection);
+	void Connect(UDPXAddress* Address, ConnectionHandelerFn connection);
 }
 
 #endif // UDPX_H
