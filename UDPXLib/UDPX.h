@@ -4,13 +4,13 @@
 #include "windows.h"
 #include <map>
 
+using std::map;
+
 #define UDPX_PACKETHEADERSIZE (1 + 4 + 4)
 #define UDPX_MAXPACKETSIZE (65536 - UDPX_PACKETHEADERSIZE)
 #define UDPX_SEQUENCEWINDOW (100)
 namespace UDPX
 {
-	typedef map<int, BYTE*> StoredPacketType;
-
 	enum PacketType : BYTE
     {
         Sequenced,
@@ -53,31 +53,37 @@ namespace UDPX
 		SOCKET handle;
 	};
 
-	void Send(Socket* s, UDPXAddress* address, BYTE data, int length)
+	void Send(Socket* s, UDPXAddress* address, BYTE* data, int length)
 	{
 	}
-	
+
+	typedef map<int,BYTE*> StoredPacketType;
+
 	class UDPXConnection
 	{
 	public:
 		UDPXConnection();
 		UDPXConnection(UDPXAddress Address);
 		UDPXConnection(UDPXAddress* Address);
-		void				Send(BYTE Data);
-		void				SendUnchecked(BYTE Data);
+		void				Send(BYTE* Data);
+		void				SendUnchecked(BYTE* Data);
 		void				Disconnect(void);
 		void				SetKeepAlive(double Time);
 		void				SetTimeout(double Time);
 		void				SetDisconnectEvent(DisconnectedFn fp);
 		void				SetReceivedPacketEvent(ReceivedPacketFn fp);
+		void				SetReceivedPacketOrderdEvent(ReceivedPacketFn fp);
 		UDPXAddress*		GetAddress();
 		void				ReciveRaw(BYTE* Data, int Length);
 		void				SetReciveSequence(int Sequence);
 		void				SetSendSequence(int Sequence);
 	private:
 		bool				ValidPacket(int RS, int SS);
+		void				SendRequest(int Sequence);
+		void				SendRaw(BYTE* Data, int Length);
 		DisconnectedFn		m_pDisconnected;
 		ReceivedPacketFn	m_ReceivedPacket;
+		ReceivedPacketFn	m_ReceivedPacketOrderd;
 		double				m_KeepAlive;
 		double				m_Timeout;
 		UDPXAddress*		m_pAddress;
@@ -85,8 +91,9 @@ namespace UDPX
 		int					m_ReciveSequence;
 		int					m_SendSequence;
 		int					m_LastReceiveSequence;
-		int					ProccessReciveNumber(int RS);
+		void				ProccessReciveNumber(int RS);
 		StoredPacketType	m_SentPackets;
+		StoredPacketType	m_RecivedPackets;
 	};
 
 
