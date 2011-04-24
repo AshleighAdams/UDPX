@@ -482,15 +482,15 @@ namespace UDPX
 				BYTE packet[UDPX_MAXPACKETSIZE];
 				UDPXAddress* Sender;
 				int recived = s.Receive(Sender, packet, UDPX_MAXPACKETSIZE);
+				if(recived == -1) break;
 				if(Sender->GetAddress() == Address->GetAddress() && Sender->GetPort() == Address->GetPort()) // make sure it's from the correct person.
 				{
-					if(recived == -1) break;
 					if(recived == 5 && packet[0] == PacketType::HandshakeAck)
 					{
 						int recsequence = _ReadInt(packet, 1);
 						UDPXConnection* connection = new UDPXConnection(Sender);
 						connection->m_ReciveSequence = recsequence;
-
+						OnConnect(connection);
 						PacketQueue* Node = FirstNode;
 						while(Node)
 						{

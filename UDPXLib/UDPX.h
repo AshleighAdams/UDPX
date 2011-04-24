@@ -1,6 +1,9 @@
 #ifndef UDPX_H
 #define UDPX_H
 
+#pragma comment(lib, "ws2_32.lib")
+
+#include "winsock2.h"
 #include "windows.h"
 #include <map>
 
@@ -53,9 +56,7 @@ namespace UDPX
 		SOCKET handle;
 	};
 
-	void Send(Socket* s, UDPXAddress* address, BYTE* data, int length)
-	{
-	}
+	void Send(Socket* s, UDPXAddress* address, BYTE* data, int length);
 
 	typedef map<int,BYTE*> StoredPacketType;
 
@@ -105,7 +106,7 @@ namespace UDPX
 	DWORD WINAPI ConnectThread(void* arg);
 	DWORD WINAPI IncomingPacketThread(void* arg);
 
-	typedef void (__stdcall *ConnectionHandelerFn)(UDPXConnection Connection);
+	typedef void (__stdcall *ConnectionHandelerFn)(UDPXConnection* Connection);
 	void Listen(int port, ConnectionHandelerFn connection);
 	void Connect(UDPXAddress* Address, ConnectionHandelerFn connection);
 }
