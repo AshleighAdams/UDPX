@@ -63,7 +63,7 @@ namespace UDPX
 	{
 	public:
 		friend DWORD (WINAPI ConnectThread)(void*); // This is just so we can access private members from some threads (the connect thread that is not a part of the object
-		friend DWORD (WINAPI IncomingPacketThread)(void*);
+		friend DWORD (WINAPI IncomingPacketThread)(void*); // and neither is this one)
 		UDPXConnection();
 		UDPXConnection(UDPXAddress Address);
 		UDPXConnection(UDPXAddress* Address);

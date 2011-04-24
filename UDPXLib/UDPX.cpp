@@ -152,8 +152,14 @@ namespace UDPX
 	DWORD WINAPI IncomingPacketThread(void* arg)
 	{
 		UDPXConnection* _this = (UDPXConnection*)arg;
+		int Recived;
 		while(true)
 		{
+			UDPXAddress* Sender;
+			BYTE Data[UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE];
+			Recived = _this->m_pSocket->Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
+			if(Recived)
+				_this->ReciveRaw(Data, Recived);
 			Sleep(1);
 		}
 	}
@@ -329,7 +335,12 @@ namespace UDPX
 						{
 							// Store the data (if needed).
 							if (this->m_ReceivedPacketOrderd)
-								this->m_RecivedPackets[sc] = pdata;
+							{
+								BYTE* packettostore = new BYTE[sizeof(pdata)]; // We need to copy it, it gets deleted after
+								for(int i = 0; i < sizeof(pdata); i++)
+									packettostore[i] = pdata[i];
+								this->m_RecivedPackets[sc] = packettostore;
+							}
 							else
 								this->m_RecivedPackets[sc] = NULL;
 	                        
