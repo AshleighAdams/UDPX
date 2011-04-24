@@ -137,8 +137,8 @@ namespace UDPX
 		typedef int socklen_t;
 		socklen_t fromLength = sizeof(sockaddr_in);
 		sockaddr_in pAddr;
-		cout << "recieving data..." << endl;
-		int received_bytes = recvfrom( this->handle, (char*)data, size, 0,  (sockaddr*)&pAddr, &fromLength);//this passed sender for the sockaddr...(the dangers of c-casts arise!)
+
+		int received_bytes = recvfrom(this->handle, (char*)data, size, 0,  (sockaddr*)&pAddr, &fromLength);//this passed sender for the sockaddr...(the dangers of c-casts arise!)
 		
 		if(received_bytes == SOCKET_ERROR)
 		{
@@ -167,6 +167,13 @@ namespace UDPX
 	void UDPXConnection::Init()
 	{
 		// TODO create thread for reciving
+		this->m_InitialSequence = 0;
+		this->m_KeepAlive = 0.0;
+		this->m_LastKeepAlive = 0.0;
+		this->m_LastReceiveSequence = 0;
+		this->m_ReciveSequence = 0;
+		this->m_SendSequence = 0;
+		this->m_Timeout = 0.0;
 		this->m_pSocket = new Socket();
 		this->m_IncomingPacketThreadHandle = CreateThread(NULL, NULL, IncomingPacketThread, this, NULL, NULL);
 	}
@@ -179,11 +186,6 @@ namespace UDPX
 		TerminateThread(this->m_IncomingPacketThreadHandle, 0);
 		delete this->m_pAddress;
 		delete this->m_pSocket;
-	}
-	UDPXConnection::UDPXConnection(UDPXAddress Address)
-	{
-		this->Init();
-		this->m_pAddress = &Address;
 	}
 	UDPXConnection::UDPXConnection(UDPXAddress* Address)
 	{
@@ -259,7 +261,6 @@ namespace UDPX
 	}
 	void UDPXConnection::SendRaw(BYTE* Data, int Length)
 	{
-		
 		this->m_pSocket->Send(this->m_pAddress, (const char*)Data, Length);
 	}
 	void UDPXConnection::SendRequest(int Sequence)

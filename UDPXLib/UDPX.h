@@ -66,7 +66,6 @@ namespace UDPX
 		friend DWORD (WINAPI ConnectThread)(void*); // This is just so we can access private members from some threads (the connect thread that is not a part of the object
 		friend DWORD (WINAPI IncomingPacketThread)(void*); // and neither is this one)
 		UDPXConnection();
-		UDPXConnection(UDPXAddress Address);
 		UDPXConnection(UDPXAddress* Address);
 		~UDPXConnection();
 		void				Send(BYTE* Data);
@@ -92,6 +91,7 @@ namespace UDPX
 		ReceivedPacketFn	m_ReceivedPacket;
 		ReceivedPacketFn	m_ReceivedPacketOrderd;
 		double				m_KeepAlive;
+		double				m_LastKeepAlive;
 		double				m_Timeout;
 		UDPXAddress*		m_pAddress;
 		Socket*				m_pSocket;
