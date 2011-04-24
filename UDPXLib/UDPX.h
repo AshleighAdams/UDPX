@@ -36,7 +36,7 @@ namespace UDPX
 	};
 
 	typedef void (__stdcall *DisconnectedFn)(bool Explict);
-	typedef void (__stdcall *ReceivedPacketFn)(bool Checked, BYTE Data);
+	typedef void (__stdcall *ReceivedPacketFn)(bool Checked, BYTE* Data, int Length);
 	
 	class Socket
 	{
@@ -69,12 +69,15 @@ namespace UDPX
 		void				SetReceivedPacketEvent(ReceivedPacketFn fp);
 		UDPXAddress*		GetAddress();
 	private:
+		void				ReciveRaw(BYTE* Data, int Length);
 		DisconnectedFn		m_pDisconnected;
 		ReceivedPacketFn	m_ReceivedPacket;
 		double				m_KeepAlive;
 		double				m_Timeout;
 		UDPXAddress*		m_pAddress;
 		Socket*				m_pSocket;
+		int					m_ReciveSequence;
+		int					m_SendSequence;
 	};
 
 

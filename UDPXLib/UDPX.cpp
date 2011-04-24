@@ -28,11 +28,17 @@ namespace UDPX
 	// Private
 	void _WriteInt(int Val, BYTE* Data, int Offset)
     {
-        Val = (int)htonl(Val);
+        Val = htonl(Val);
         Data[Offset + 0] = (byte)Val;
         Data[Offset + 1] = (byte)(Val >> 8);
         Data[Offset + 2] = (byte)(Val >> 16);
         Data[Offset + 3] = (byte)(Val >> 24);
+    }
+
+	int _ReadInt(BYTE* Data, int Offset)
+    {
+        int Int = (int)Data[Offset + 0] + ((int)Data[Offset + 1] << 8) + ((int)Data[Offset + 2] << 16) + ((int)Data[Offset + 3] << 24);
+        return ntohl(Int);
     }
 	
 	// Public
@@ -175,9 +181,11 @@ namespace UDPX
 	}
 	void UDPXConnection::SetDisconnectEvent(DisconnectedFn fp)
 	{
+		this->m_pDisconnected = fp;
 	}
 	void UDPXConnection::SetReceivedPacketEvent(ReceivedPacketFn fp)
 	{
+		this->m_ReceivedPacket = fp;
 	}
 	UDPXAddress* UDPXConnection::GetAddress()
 	{
@@ -185,7 +193,50 @@ namespace UDPX
 	}
 
 
-	
+	void UDPXConnection::ReciveRaw(BYTE *Data, int Length)
+	{
+		if(Length < 1) return;
+		PacketType type = Data[0];
+		switch(type)
+		{
+		case PacketType::Handshake:
+			break;
+
+		case PacketType::HandshakeAck:
+			break;
+
+		case PacketType::Unsequenced:
+			BYTE pdata[Length-1];
+            for (int t = 0; t < Length; t++)
+                pdata[t] = Data[t + 1];
+			if(this->m_ReceivedPacket)
+				this->m_ReceivedPacket(false, pdata, Length -1);
+			break;
+
+		case PacketType::Sequenced:
+			if (Length < UDPX_PACKETHEADERSIZE)
+                break;
+
+            // Get actual packet data
+            pdatas = new byte[Data.Length - _PacketHeaderSize];
+            for (int t = 0; t < pdata.Length; t++)
+            {
+                pdata[t] = Data[t + _PacketHeaderSize];
+            }
+			break;
+
+		case PacketType::KeepAlive:
+			break;
+
+		case PacketType::Request:
+			break;
+
+		case PacketType::Disconnect:
+			break;
+
+		}
+	}
+
 	void Listen(int Port, ConnectionHandelerFn connection)
 	{
 		
@@ -208,7 +259,7 @@ namespace UDPX
 	{
 		ConnectThreadArugments* args = (ConnectThreadArugments*)arg;
 		UDPXAddress* Address = args->Address;
-		ConnectionHandelerFn connection = args->ConnectionHandeler;
+		ConnectionHandelerFn OnConnect = args->ConnectionHandeler;
 		free(args); // we don't need you anymore
 
 		srand(time(NULL));
@@ -240,15 +291,20 @@ namespace UDPX
 					if(recived == -1) break;
 					if(recived == 5 && packet[0] == PacketType::HandshakeAck)
 					{
-						// Do recive stuff
+						int recsequence = _ReadInt(packet, 1);
+						UDPXConnection* connection = new UDPXConnection(Sender);
+						
 						PacketQueue* Node = FirstNode;
 						while(Node)
 						{
-							// Do stuff with node->data
+							//Simulate the packet once we connect
+							connection->ReciveRaw(Node->Data, Node->Length);
+
 							PacketQueue* LastNode = Node;
 							Node = Node->Next;
 							free(LastNode);
 						}
+						return 0;
 					}
 					else
 					{
@@ -269,6 +325,7 @@ namespace UDPX
 					}
 				}
 			}
+			Sleep(Timeout * 1000);
 		}
 		if(FirstNode) // Lets free any data there may have been
 		{
@@ -280,6 +337,8 @@ namespace UDPX
 				free(LastNode);
 			}
 		}
+		OnConnect(NULL);
+		return 0;
 	}
 
 	void Connect(UDPXAddress* Address, ConnectionHandelerFn connection)
