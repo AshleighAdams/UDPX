@@ -62,6 +62,7 @@ namespace UDPX
 	class UDPXConnection
 	{
 	public:
+		friend DWORD (WINAPI ConnectThread)(void*);
 		UDPXConnection();
 		UDPXConnection(UDPXAddress Address);
 		UDPXConnection(UDPXAddress* Address);
@@ -74,10 +75,8 @@ namespace UDPX
 		void				SetReceivedPacketEvent(ReceivedPacketFn fp);
 		void				SetReceivedPacketOrderdEvent(ReceivedPacketFn fp);
 		UDPXAddress*		GetAddress(void);
-		void				ReciveRaw(BYTE* Data, int Length);
-		void				SetReciveSequence(int Sequence);
-		void				SetSendSequence(int Sequence);
 	private:
+		void				ReciveRaw(BYTE* Data, int Length);
 		bool				ValidPacket(int RS, int SS);
 		void				SendRequest(int Sequence);
 		void				SendRaw(BYTE* Data, int Length);
@@ -90,6 +89,7 @@ namespace UDPX
 		double				m_Timeout;
 		UDPXAddress*		m_pAddress;
 		Socket*				m_pSocket;
+		int					m_InitialSequence;
 		int					m_ReciveSequence;
 		int					m_SendSequence;
 		int					m_LastReceiveSequence;
@@ -97,7 +97,8 @@ namespace UDPX
 		StoredPacketType	m_SentPackets;
 		StoredPacketType	m_RecivedPackets;
 	};
-
+	
+	DWORD WINAPI ConnectThread(void* arg);
 
 	typedef void (__stdcall *ConnectionHandelerFn)(UDPXConnection Connection);
 	void Listen(int port, ConnectionHandelerFn connection);

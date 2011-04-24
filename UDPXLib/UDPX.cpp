@@ -150,11 +150,9 @@ namespace UDPX
 	}
 
 
-
-
-	
 	UDPXConnection::UDPXConnection()
 	{
+		
 	}
 	UDPXConnection::UDPXConnection(UDPXAddress Address)
 	{
@@ -193,14 +191,6 @@ namespace UDPX
 	{
 		this->m_ReceivedPacketOrderd = fp;
 	}
-	void UDPXConnection::SetReciveSequence(int Sequence)
-	{
-		this->m_ReciveSequence = Sequence;
-	}
-	void UDPXConnection::SetSendSequence(int Sequence)
-	{
-		this->m_SendSequence = Sequence;
-	}
 	UDPXAddress* UDPXConnection::GetAddress()
 	{
 		return this->m_pAddress;
@@ -238,7 +228,8 @@ namespace UDPX
 	}
 	void UDPXConnection::ProcessReciveNumber(int RS)
 	{
-		while (this->m_SentPackets.erase(--RS));
+		while (this->m_SentPackets.count(--RS) > 0)
+			this->m_SentPackets.erase(RS);
 	}
 	void UDPXConnection::ReciveRaw(BYTE *Data, int Length)
 	{
@@ -247,128 +238,144 @@ namespace UDPX
 		BYTE* pdata;
 		switch(type)
 		{
-		case PacketType::Handshake:
-			break;
+			case PacketType::Handshake:
+				BYTE handshakeack[5];
+				handshakeack[0] = PacketType::HandshakeAck;
+				_WriteInt(this->m_InitialSequence, handshakeack, 1);
+				this->SendRaw(handshakeack,5);
+				break;
 
-		case PacketType::HandshakeAck:
-			break;
+			case PacketType::HandshakeAck:
+				break;
 
-		case PacketType::Unsequenced:
-			pdata = new BYTE[Length-1];
-            for (int t = 0; t < Length; t++)
-                pdata[t] = Data[t + 1];
-			if(this->m_ReceivedPacket)
-				this->m_ReceivedPacket(false, pdata, Length -1);
-			break;
+			case PacketType::Unsequenced:
+				pdata = new BYTE[Length-1];
+				for (int t = 0; t < Length; t++)
+					pdata[t] = Data[t + 1];
+				if(this->m_ReceivedPacket)
+					this->m_ReceivedPacket(false, pdata, Length -1);
+				break;
 
-		case PacketType::Sequenced:
-		{
-			if (Length < UDPX_PACKETHEADERSIZE)
-                break;
-			
-            // get packet data
-            pdata = new BYTE[Length - UDPX_PACKETHEADERSIZE];
-            for (int t = 0; t < (Length - UDPX_PACKETHEADERSIZE); t++)
-                pdata[t] = Data[t + UDPX_PACKETHEADERSIZE];
-			
-			int sc = _ReadInt(Data, 1);
-            int rc = _ReadInt(Data, 5);
-            if (this->ValidPacket(sc, rc))
-            {
-				this->ProcessReciveNumber(rc);
+			case PacketType::Sequenced:
+			{
+				if (Length < UDPX_PACKETHEADERSIZE)
+					break;
+				
+				// get packet data
+				pdata = new BYTE[Length - UDPX_PACKETHEADERSIZE];
+				for (int t = 0; t < (Length - UDPX_PACKETHEADERSIZE); t++)
+					pdata[t] = Data[t + UDPX_PACKETHEADERSIZE];
+				
+				int sc = _ReadInt(Data, 1);
+				int rc = _ReadInt(Data, 5);
+				if (this->ValidPacket(sc, rc))
+				{
+					this->ProcessReciveNumber(rc);
 
-				/// This code needs to be C++ified
-				// See if this packet is actually needed
-                if (!(this->m_RecivedPackets.count(sc) > 0))
-                {
-                    if (sc > this->m_LastReceiveSequence)
-                        this->m_LastReceiveSequence = sc;
-                    
-                    // Give receive callback
-                    if (this->m_ReceivedPacket)
-                        this->m_ReceivedPacket(true, pdata, (Length - UDPX_PACKETHEADERSIZE));
-                    
-                    if (sc == this->m_ReciveSequence)
-                    {
-                        // Give ordered receive packet callback (and update receive numbers).
-                        while (true)
-                        {
-                            this->m_ReciveSequence++;
-                            sc++;
-                            if (this->m_ReceivedPacketOrderd)
-                                this->m_ReceivedPacketOrderd(true, pdata, sizeof(pdata));
-                            
-							if(this->m_RecivedPackets.count(sc) > 0)
+					/// This code needs to be C++ified
+					// See if this packet is actually needed
+					if (!(this->m_RecivedPackets.count(sc) > 0))
+					{
+						if (sc > this->m_LastReceiveSequence)
+							this->m_LastReceiveSequence = sc;
+	                    
+						// Give receive callback
+						if (this->m_ReceivedPacket)
+							this->m_ReceivedPacket(true, pdata, (Length - UDPX_PACKETHEADERSIZE));
+	                    
+						if (sc == this->m_ReciveSequence)
+						{
+							// Give ordered receive packet callback (and update receive numbers).
+							while (true)
 							{
-								pdata = this->m_RecivedPackets.find(sc)->second;
-								this->m_RecivedPackets.erase(sc);
+								this->m_ReciveSequence++;
+								sc++;
+								if (this->m_ReceivedPacketOrderd)
+									this->m_ReceivedPacketOrderd(true, pdata, sizeof(pdata));
+	                            
+								if(this->m_RecivedPackets.count(sc) > 0)
+								{
+									pdata = this->m_RecivedPackets.find(sc)->second;
+									this->m_RecivedPackets.erase(sc);
+								}
+								else break; // Don't have the next packet, lets stop here.
 							}
-                            else
-                            {	// Don't have the next packet,
-                                // have to stop here.
-                                break;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // Store the data (if needed).
-                        if (this->m_ReceivedPacketOrderd)
-                            this->m_RecivedPackets[sc] = pdata;
-                        else
-                            this->m_RecivedPackets[sc] = NULL;
-                        
-                    }
+						}
+						else
+						{
+							// Store the data (if needed).
+							if (this->m_ReceivedPacketOrderd)
+								this->m_RecivedPackets[sc] = pdata;
+							else
+								this->m_RecivedPackets[sc] = NULL;
+	                        
+						}
 
-                    // Request all previous packets we need
-                    for (int i = this->m_ReciveSequence; i < this->m_LastReceiveSequence; i++)
-                        if (!(this->m_RecivedPackets.count(sc) > 0))
-                            this->SendRequest(i);
-                }
+						// Request all previous packets we need
+						for (int i = this->m_ReciveSequence; i < this->m_LastReceiveSequence; i++)
+							if (!(this->m_RecivedPackets.count(sc) > 0))
+								this->SendRequest(i);
+					}
 
-				/// End C++ifide
-			}
-		}break;
+					/// End C++ifide
+				}
+			}break;
 
-		case PacketType::KeepAlive:
-		{
-			if (Length < UDPX_PACKETHEADERSIZE)
-                break;
+			case PacketType::KeepAlive:
+			{
+				if (Length < UDPX_PACKETHEADERSIZE)
+					break;
 
-            // Decode sequence and receive numbers
-            int sc = _ReadInt(Data, 1); // Contains the last sent sequence number
-            int rc = _ReadInt(Data, 5);
+				// Decode sequence and receive numbers
+				int sc = _ReadInt(Data, 1); // Contains the last sent sequence number
+				int rc = _ReadInt(Data, 5);
 
-            if (this->ValidPacket(sc, rc))
-            {
-                this->ProcessReciveNumber(rc);
+				if (this->ValidPacket(sc, rc))
+				{
+					this->ProcessReciveNumber(rc);
 
-                // Request previous packets that are needed
-                for (int i = this->m_ReciveSequence; i <= sc; i++)
-                {
-                    if (!(this->m_RecivedPackets.count(i) > 0))
-                        this->SendRequest(i);
-                }
-            }
-		}break;
+					// Request previous packets that are needed
+					for (int i = this->m_ReciveSequence; i <= sc; i++)
+					{
+						if (!(this->m_RecivedPackets.count(i) > 0))
+							this->SendRequest(i);
+					}
+				}
+			}break;
 
-		case PacketType::Request:
-		{
-			if (Length < 5)
-                break;
-            
-            int sc = _ReadInt(Data, 1);
+			case PacketType::Request:
+			{
+				if (Length < 5)
+					break;
+	            
+				int sc = _ReadInt(Data, 1);
 
-            // Send out requested packet
-            if (this->m_SentPackets.count(sc) > 0)// this._Sent.TryGetValue(sc, out tosend))
-            {
-				BYTE* tosend = this->m_SentPackets.find(sc)->second;
-                this->SendWithSequence(sc, tosend, sizeof(tosend));
-            }
-		}break;
+				// Send out requested packet
+				if (this->m_SentPackets.count(sc) > 0)// this._Sent.TryGetValue(sc, out tosend))
+				{
+					BYTE* tosend = this->m_SentPackets.find(sc)->second;
+					this->SendWithSequence(sc, tosend, sizeof(tosend));
+				}
+			}break;
 
-		case PacketType::Disconnect:
-			break;
+			case PacketType::Disconnect:
+			{
+				if (Length < UDPX_PACKETHEADERSIZE)
+					break;
+
+				// Decode sequence and receive numbers (to prove this is a valid disconnect).
+				int sc = _ReadInt(Data, 1);
+				int rc = _ReadInt(Data, 5);
+
+				if (this->ValidPacket(sc, rc))
+				{
+					if (this->m_pDisconnected)
+						this->m_pDisconnected(true);
+					
+					delete this;
+				}
+				break;
+			}break;
 
 		}
 	}
@@ -429,7 +436,7 @@ namespace UDPX
 					{
 						int recsequence = _ReadInt(packet, 1);
 						UDPXConnection* connection = new UDPXConnection(Sender);
-						connection->SetReciveSequence(recsequence);
+						connection->m_ReciveSequence = recsequence;
 
 						PacketQueue* Node = FirstNode;
 						while(Node)
