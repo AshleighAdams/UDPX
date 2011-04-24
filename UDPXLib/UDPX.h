@@ -68,8 +68,8 @@ namespace UDPX
 		void				SetDisconnectEvent(DisconnectedFn fp);
 		void				SetReceivedPacketEvent(ReceivedPacketFn fp);
 		UDPXAddress*		GetAddress();
-	private:
 		void				ReciveRaw(BYTE* Data, int Length);
+	private:
 		DisconnectedFn		m_pDisconnected;
 		ReceivedPacketFn	m_ReceivedPacket;
 		double				m_KeepAlive;

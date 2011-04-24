@@ -196,7 +196,8 @@ namespace UDPX
 	void UDPXConnection::ReciveRaw(BYTE *Data, int Length)
 	{
 		if(Length < 1) return;
-		PacketType type = Data[0];
+		BYTE type = Data[0];
+		BYTE* pdata;
 		switch(type)
 		{
 		case PacketType::Handshake:
@@ -206,7 +207,7 @@ namespace UDPX
 			break;
 
 		case PacketType::Unsequenced:
-			BYTE pdata[Length-1];
+			pdata = new BYTE[Length-1];
             for (int t = 0; t < Length; t++)
                 pdata[t] = Data[t + 1];
 			if(this->m_ReceivedPacket)
@@ -218,11 +219,10 @@ namespace UDPX
                 break;
 
             // Get actual packet data
-            pdatas = new byte[Data.Length - _PacketHeaderSize];
-            for (int t = 0; t < pdata.Length; t++)
-            {
-                pdata[t] = Data[t + _PacketHeaderSize];
-            }
+            pdata = new BYTE[Length - UDPX_PACKETHEADERSIZE];
+            for (int t = 0; t < (Length - UDPX_PACKETHEADERSIZE); t++)
+                pdata[t] = Data[t + UDPX_PACKETHEADERSIZE];
+            
 			break;
 
 		case PacketType::KeepAlive:
