@@ -221,7 +221,22 @@ namespace UDPX
         _WriteInt(Sequence, pdata, 1);
         this->SendRaw(pdata, 5);
 	}
-	void UDPXConnection::ProccessReciveNumber(int RS)
+	void UDPXConnection::SendWithSequence(int Sequence, BYTE* Data, int Length)
+	{
+		BYTE* pdata = new BYTE[Length + UDPX_PACKETHEADERSIZE];
+		pdata[0] = PacketType::Sequenced;
+        _WriteInt(Sequence, pdata, 1);
+        _WriteInt(this->m_ReciveSequence, pdata, 5);
+        for (int t = 0; t < Length; t++)
+            pdata[t + UDPX_PACKETHEADERSIZE] = Data[t];
+        this->ResetKeepAlive();
+        this->SendRaw(pdata, Length + UDPX_PACKETHEADERSIZE);
+	}
+	void UDPXConnection::ResetKeepAlive()
+	{
+		
+	}
+	void UDPXConnection::ProcessReciveNumber(int RS)
 	{
 		while (this->m_SentPackets.erase(--RS));
 	}
@@ -260,7 +275,7 @@ namespace UDPX
             int rc = _ReadInt(Data, 5);
             if (this->ValidPacket(sc, rc))
             {
-				this->ProccessReciveNumber(rc);
+				this->ProcessReciveNumber(rc);
 
 				/// This code needs to be C++ified
 				// See if this packet is actually needed
@@ -299,13 +314,10 @@ namespace UDPX
                     {
                         // Store the data (if needed).
                         if (this->m_ReceivedPacketOrderd)
-                        {
                             this->m_RecivedPackets[sc] = pdata;
-                        }
                         else
-                        {
                             this->m_RecivedPackets[sc] = NULL;
-                        }
+                        
                     }
 
                     // Request all previous packets we need
@@ -316,14 +328,44 @@ namespace UDPX
 
 				/// End C++ifide
 			}
-		}
-			break;
+		}break;
 
 		case PacketType::KeepAlive:
-			break;
+		{
+			if (Length < UDPX_PACKETHEADERSIZE)
+                break;
+
+            // Decode sequence and receive numbers
+            int sc = _ReadInt(Data, 1); // Contains the last sent sequence number
+            int rc = _ReadInt(Data, 5);
+
+            if (this->ValidPacket(sc, rc))
+            {
+                this->ProcessReciveNumber(rc);
+
+                // Request previous packets that are needed
+                for (int i = this->m_ReciveSequence; i <= sc; i++)
+                {
+                    if (!(this->m_RecivedPackets.count(i) > 0))
+                        this->SendRequest(i);
+                }
+            }
+		}break;
 
 		case PacketType::Request:
-			break;
+		{
+			if (Length < 5)
+                break;
+            
+            int sc = _ReadInt(Data, 1);
+
+            // Send out requested packet
+            if (this->m_SentPackets.count(sc) > 0)// this._Sent.TryGetValue(sc, out tosend))
+            {
+				BYTE* tosend = this->m_SentPackets.find(sc)->second;
+                this->SendWithSequence(sc, tosend, sizeof(tosend));
+            }
+		}break;
 
 		case PacketType::Disconnect:
 			break;

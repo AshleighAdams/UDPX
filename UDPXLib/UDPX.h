@@ -73,7 +73,7 @@ namespace UDPX
 		void				SetDisconnectEvent(DisconnectedFn fp);
 		void				SetReceivedPacketEvent(ReceivedPacketFn fp);
 		void				SetReceivedPacketOrderdEvent(ReceivedPacketFn fp);
-		UDPXAddress*		GetAddress();
+		UDPXAddress*		GetAddress(void);
 		void				ReciveRaw(BYTE* Data, int Length);
 		void				SetReciveSequence(int Sequence);
 		void				SetSendSequence(int Sequence);
@@ -81,6 +81,8 @@ namespace UDPX
 		bool				ValidPacket(int RS, int SS);
 		void				SendRequest(int Sequence);
 		void				SendRaw(BYTE* Data, int Length);
+		void				SendWithSequence(int Sequence, BYTE* Data, int Length);
+		void				ResetKeepAlive(void);
 		DisconnectedFn		m_pDisconnected;
 		ReceivedPacketFn	m_ReceivedPacket;
 		ReceivedPacketFn	m_ReceivedPacketOrderd;
@@ -91,7 +93,7 @@ namespace UDPX
 		int					m_ReciveSequence;
 		int					m_SendSequence;
 		int					m_LastReceiveSequence;
-		void				ProccessReciveNumber(int RS);
+		void				ProcessReciveNumber(int RS);
 		StoredPacketType	m_SentPackets;
 		StoredPacketType	m_RecivedPackets;
 	};
