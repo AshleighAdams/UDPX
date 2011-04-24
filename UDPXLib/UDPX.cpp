@@ -158,7 +158,7 @@ namespace UDPX
 			UDPXAddress* Sender;
 			BYTE Data[UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE];
 			Recived = _this->m_pSocket->Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
-			if(Recived)
+			if(Recived > 0)
 				_this->ReciveRaw(Data, Recived);
 			Sleep(1);
 		}
