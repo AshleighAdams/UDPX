@@ -191,12 +191,31 @@ namespace UDPX
 	}
 	void UDPXConnection::Send(BYTE* Data)
 	{
+		BYTE* data = new BYTE[sizeof(Data)]; // copy it so it can be disposed
+		for(int i = 0; i < sizeof(Data); i++)
+			data[i] = Data[i];
+		this->SendWithSequence(this->m_SendSequence, data, sizeof(data));
+		this->m_SentPackets[this->m_SendSequence] = data;
+		this->m_SendSequence++;
 	}
 	void UDPXConnection::SendUnchecked(BYTE* Data)
 	{
+		int Length = sizeof(Data);
+		BYTE* pdata = new BYTE[Length + 1];
+		pdata[0] = PacketType::Unsequenced;
+		for (int t = 0; t < Length; t++)
+			pdata[t + 1] = Data[t];
+		this->ResetKeepAlive();
+		this->SendRaw(pdata, Length+1);
 	}
 	void UDPXConnection::Disconnect(void)
 	{
+		BYTE* pdata = new byte[UDPX_PACKETHEADERSIZE];
+		pdata[0] = PacketType::Disconnect;
+		_WriteInt(this->m_SendSequence, pdata, 1);
+		_WriteInt(this->m_ReciveSequence, pdata, 5);
+		this->SendRaw(pdata, 5);
+		delete this;
 	}
 	void UDPXConnection::SetKeepAlive(double Time)
 	{
