@@ -148,18 +148,39 @@ namespace UDPX
 		sender = new UDPXAddress(pAddr.sin_addr.s_addr,pAddr.sin_port);//seeing as there are no set methods...
 		return received_bytes;
 	}
-
-
+	
+	DWORD WINAPI IncomingPacketThread(void* arg)
+	{
+		UDPXConnection* _this = (UDPXConnection*)arg;
+		while(true)
+		{
+			Sleep(1);
+		}
+	}
+	void UDPXConnection::Init()
+	{
+		// TODO create thread for reciving
+		this->m_pSocket = new Socket();
+		this->m_IncomingPacketThreadHandle = CreateThread(NULL, NULL, IncomingPacketThread, this, NULL, NULL);
+	}
 	UDPXConnection::UDPXConnection()
 	{
-		
+		this->Init();
+	}
+	UDPXConnection::~UDPXConnection()
+	{
+		TerminateThread(this->m_IncomingPacketThreadHandle, 0);
+		delete this->m_pAddress;
+		delete this->m_pSocket;
 	}
 	UDPXConnection::UDPXConnection(UDPXAddress Address)
 	{
+		this->Init();
 		this->m_pAddress = &Address;
 	}
 	UDPXConnection::UDPXConnection(UDPXAddress* Address)
 	{
+		this->Init();
 		this->m_pAddress = Address;
 	}
 	void UDPXConnection::Send(BYTE* Data)
@@ -201,15 +222,16 @@ namespace UDPX
 	}
 	void UDPXConnection::SendRaw(BYTE* Data, int Length)
 	{
-		Socket s;
-		s.Send(this->m_pAddress, (const char*)Data, Length);
+		
+		this->m_pSocket->Send(this->m_pAddress, (const char*)Data, Length);
 	}
 	void UDPXConnection::SendRequest(int Sequence)
 	{
-		byte pdata[5];
+		BYTE pdata[5];
 		pdata[0] = PacketType::Request;
         _WriteInt(Sequence, pdata, 1);
         this->SendRaw(pdata, 5);
+		delete pdata;
 	}
 	void UDPXConnection::SendWithSequence(int Sequence, BYTE* Data, int Length)
 	{
@@ -221,6 +243,7 @@ namespace UDPX
             pdata[t + UDPX_PACKETHEADERSIZE] = Data[t];
         this->ResetKeepAlive();
         this->SendRaw(pdata, Length + UDPX_PACKETHEADERSIZE);
+		delete pdata;
 	}
 	void UDPXConnection::ResetKeepAlive()
 	{
@@ -243,6 +266,7 @@ namespace UDPX
 				handshakeack[0] = PacketType::HandshakeAck;
 				_WriteInt(this->m_InitialSequence, handshakeack, 1);
 				this->SendRaw(handshakeack,5);
+				delete handshakeack;
 				break;
 
 			case PacketType::HandshakeAck:
@@ -371,13 +395,12 @@ namespace UDPX
 				{
 					if (this->m_pDisconnected)
 						this->m_pDisconnected(true);
-					
-					delete this;
+					delete this; // We don't need ourself anymore
 				}
 				break;
 			}break;
-
 		}
+		delete pdata;
 	}
 
 	void Listen(int Port, ConnectionHandelerFn connection)

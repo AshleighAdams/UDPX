@@ -62,10 +62,12 @@ namespace UDPX
 	class UDPXConnection
 	{
 	public:
-		friend DWORD (WINAPI ConnectThread)(void*);
+		friend DWORD (WINAPI ConnectThread)(void*); // This is just so we can access private members from some threads (the connect thread that is not a part of the object
+		friend DWORD (WINAPI IncomingPacketThread)(void*);
 		UDPXConnection();
 		UDPXConnection(UDPXAddress Address);
 		UDPXConnection(UDPXAddress* Address);
+		~UDPXConnection();
 		void				Send(BYTE* Data);
 		void				SendUnchecked(BYTE* Data);
 		void				Disconnect(void);
@@ -76,6 +78,8 @@ namespace UDPX
 		void				SetReceivedPacketOrderdEvent(ReceivedPacketFn fp);
 		UDPXAddress*		GetAddress(void);
 	private:
+		HANDLE				m_IncomingPacketThreadHandle;
+		void				Init();
 		void				ReciveRaw(BYTE* Data, int Length);
 		bool				ValidPacket(int RS, int SS);
 		void				SendRequest(int Sequence);
@@ -99,6 +103,7 @@ namespace UDPX
 	};
 	
 	DWORD WINAPI ConnectThread(void* arg);
+	DWORD WINAPI IncomingPacketThread(void* arg);
 
 	typedef void (__stdcall *ConnectionHandelerFn)(UDPXConnection Connection);
 	void Listen(int port, ConnectionHandelerFn connection);
