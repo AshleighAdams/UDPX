@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "Test\Test.csproj", 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDPXLib", "UDPXLib\UDPXLib.vcproj", "{769D28DF-B63A-44E0-9394-DA730B01D605}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDPXLibTest", "UDPXLibTest\UDPXLibTest.vcproj", "{FE20A373-12EB-4075-877E-420CA0DEA353}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,16 @@ Global
 		{769D28DF-B63A-44E0-9394-DA730B01D605}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{769D28DF-B63A-44E0-9394-DA730B01D605}.Release|Win32.ActiveCfg = Release|Win32
 		{769D28DF-B63A-44E0-9394-DA730B01D605}.Release|Win32.Build.0 = Release|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Debug|Win32.Build.0 = Debug|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Release|Any CPU.ActiveCfg = Release|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Release|Win32.ActiveCfg = Release|Win32
+		{FE20A373-12EB-4075-877E-420CA0DEA353}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
