@@ -13,6 +13,7 @@
 #include <winsock2.h>
 #include "UDPX.h"
 #include <iostream>
+#include <map>
 #include <time.h>
 #include <limits.h>
 #include "windows.h"
@@ -21,6 +22,7 @@ using std::cout;
 using std::cerr;
 using std::cin;
 using std::endl;
+using std::map;
 using namespace UDPX;
 
 namespace UDPX
@@ -187,12 +189,26 @@ namespace UDPX
 	{
 		this->m_ReceivedPacket = fp;
 	}
+	void UDPXConnection::SetReciveSequence(int Sequence)
+	{
+		this->m_ReciveSequence = Sequence;
+	}
+	void UDPXConnection::SetSendSequence(int Sequence)
+	{
+		this->m_SendSequence = Sequence;
+	}
 	UDPXAddress* UDPXConnection::GetAddress()
 	{
 		return this->m_pAddress;
 	}
-
-
+	bool UDPXConnection::ValidPacket(int RS, int SS)
+	{
+		return SS >= this->m_ReciveSequence && SS < this->m_LastReceiveSequence + UDPX_SEQUENCEWINDOW && RS <= this->m_SendSequence && RS > this->m_SendSequence - UDPX_SEQUENCEWINDOW;
+	}
+	void UDPXConnection::ProccessReciveNumber(int RS)
+	{
+		while (this->m_SentPackets.erase(--RC));
+	}
 	void UDPXConnection::ReciveRaw(BYTE *Data, int Length)
 	{
 		if(Length < 1) return;
@@ -217,12 +233,17 @@ namespace UDPX
 		case PacketType::Sequenced:
 			if (Length < UDPX_PACKETHEADERSIZE)
                 break;
-
-            // Get actual packet data
+			
+            // get packet data
             pdata = new BYTE[Length - UDPX_PACKETHEADERSIZE];
             for (int t = 0; t < (Length - UDPX_PACKETHEADERSIZE); t++)
                 pdata[t] = Data[t + UDPX_PACKETHEADERSIZE];
-            
+			
+			int sc = _ReadInt(Data, 1);
+            int rc = _ReadInt(Data, 5);
+            if (this->ValidPacket(sc, rc))
+            {
+			}
 			break;
 
 		case PacketType::KeepAlive:
@@ -293,11 +314,11 @@ namespace UDPX
 					{
 						int recsequence = _ReadInt(packet, 1);
 						UDPXConnection* connection = new UDPXConnection(Sender);
-						
+						connection->SetReciveSequence(recsequence);
+
 						PacketQueue* Node = FirstNode;
 						while(Node)
 						{
-							//Simulate the packet once we connect
 							connection->ReciveRaw(Node->Data, Node->Length);
 
 							PacketQueue* LastNode = Node;

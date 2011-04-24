@@ -2,12 +2,15 @@
 #define UDPX_H
 
 #include "windows.h"
+#include <map>
 
 #define UDPX_PACKETHEADERSIZE (1 + 4 + 4)
 #define UDPX_MAXPACKETSIZE (65536 - UDPX_PACKETHEADERSIZE)
-
+#define UDPX_SEQUENCEWINDOW (100)
 namespace UDPX
 {
+	typedef map<int, BYTE*> StoredPacketType;
+
 	enum PacketType : BYTE
     {
         Sequenced,
@@ -69,7 +72,10 @@ namespace UDPX
 		void				SetReceivedPacketEvent(ReceivedPacketFn fp);
 		UDPXAddress*		GetAddress();
 		void				ReciveRaw(BYTE* Data, int Length);
+		void				SetReciveSequence(int Sequence);
+		void				SetSendSequence(int Sequence);
 	private:
+		bool				ValidPacket(int RS, int SS);
 		DisconnectedFn		m_pDisconnected;
 		ReceivedPacketFn	m_ReceivedPacket;
 		double				m_KeepAlive;
@@ -78,6 +84,9 @@ namespace UDPX
 		Socket*				m_pSocket;
 		int					m_ReciveSequence;
 		int					m_SendSequence;
+		int					m_LastReceiveSequence;
+		int					ProccessReciveNumber(int RS);
+		StoredPacketType	m_SentPackets;
 	};
 
 
