@@ -51,13 +51,13 @@ namespace Test
             Console.WriteLine();
             if (c == 's')
             {
-                UDPX.Listen(101, ch);
+                UDPX.Listen(100, ch);
             }
             if (c == 'c')
             {
                 Console.Write("Endpoint >> ");
                 string endpoint = Console.ReadLine();
-                UDPX.Connect(new IPEndPoint(IPAddress.Parse(endpoint), 101), ch);
+                UDPX.Connect(new IPEndPoint(IPAddress.Parse(endpoint), 100), ch);
             }
 
             while (true)

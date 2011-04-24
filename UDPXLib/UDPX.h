@@ -84,9 +84,10 @@ namespace UDPX
 		void				ReciveRaw(BYTE* Data, int Length);
 		bool				ValidPacket(int RS, int SS);
 		void				SendRequest(int Sequence);
+		void				SendKeepAlive();
+		void				ResetKeepAlive(void);
 		void				SendRaw(BYTE* Data, int Length);
 		void				SendWithSequence(int Sequence, BYTE* Data, int Length);
-		void				ResetKeepAlive(void);
 		DisconnectedFn		m_pDisconnected;
 		ReceivedPacketFn	m_ReceivedPacket;
 		ReceivedPacketFn	m_ReceivedPacketOrderd;

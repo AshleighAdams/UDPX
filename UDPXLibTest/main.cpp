@@ -23,6 +23,9 @@ void __stdcall ConnectionHandeler(UDPXConnection* Connection)
 		return;
 	}
 	std::cout<<"Connected to localhost\n";
+
+
+
 	Connection->Disconnect();
 	std::cout<<"Dissconnected from localhost\n";
 	Exit = false;

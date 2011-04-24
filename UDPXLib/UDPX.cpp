@@ -160,6 +160,7 @@ namespace UDPX
 			Recived = _this->m_pSocket->Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
 			if(Recived > 0)
 				_this->ReciveRaw(Data, Recived);
+			
 			Sleep(1);
 		}
 	}
@@ -215,7 +216,18 @@ namespace UDPX
 		_WriteInt(this->m_SendSequence, pdata, 1);
 		_WriteInt(this->m_ReciveSequence, pdata, 5);
 		this->SendRaw(pdata, 5);
+		delete pdata;
 		delete this;
+	}
+	void UDPXConnection::SendKeepAlive()
+	{
+		BYTE* pdata = new byte[UDPX_PACKETHEADERSIZE];
+		pdata[0] = PacketType::KeepAlive;
+        _WriteInt(this->m_SendSequence - 1, pdata, 1);
+        _WriteInt(this->m_ReciveSequence, pdata, 5);
+        this->ResetKeepAlive();
+        this->SendRaw(pdata, UDPX_PACKETHEADERSIZE);
+		delete pdata;
 	}
 	void UDPXConnection::SetKeepAlive(double Time)
 	{
@@ -498,7 +510,7 @@ namespace UDPX
 
 							PacketQueue* LastNode = Node;
 							Node = Node->Next;
-							free(LastNode);
+							delete LastNode;
 						}
 						return 0;
 					}
