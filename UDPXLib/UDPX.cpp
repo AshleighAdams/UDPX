@@ -132,14 +132,16 @@ namespace UDPX
 		
 		if(received_bytes == SOCKET_ERROR)
 		{
-			WSAErr();
+			if(WSAEWOULDBLOCK != WSAGetLastError()) // We just have no data to recive
+				WSAErr();
 			return -1;
 		}
 		//pAddr.sin_addr.s_addr 
 		unsigned int test = (pAddr.sin_addr.S_un.S_un_b.s_b1 << 24) | (pAddr.sin_addr.S_un.S_un_b.s_b2 << 16) | (pAddr.sin_addr.S_un.S_un_b.s_b3 << 8) | pAddr.sin_addr.S_un.S_un_b.s_b4;
-		std::cout<<test<<" in rec\n";
-		sender = new UDPXAddress(test,pAddr.sin_port);//seeing as there are no set methods...
-		std::cout<<sender->Address<<"\n";
+
+		sender->Address = test; // because fuck you
+		sender->Port = pAddr.sin_port;
+		
 		return received_bytes;
 	}
 	
@@ -149,20 +151,21 @@ namespace UDPX
 		int Recived;
 		while(true)
 		{
-			UDPXAddress* Sender;
-			BYTE Data[UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE];
+			UDPXAddress* Sender = new UDPXAddress();
+			BYTE* Data = new BYTE[UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE];
 			Recived = _this->m_Socket.Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
 			if(Recived > 0)
 				_this->ReciveRaw(Data, Recived);
 			if(_this->m_KeepAlive > 0.0)
 			{
-				_this->m_LastKeepAlive += 1.0 / 1000.0;
+				_this->m_LastKeepAlive += 0.01;
 				if(_this->m_LastKeepAlive > _this->m_KeepAlive) // Looks like we need to send another keep alive
 					_this->SendKeepAlive();
 			}
 			if(_this->m_Timeout > 0.0)
 			{
-				_this->m_LastPacketRecived += 1.0 / 1000.0;
+				_this->m_LastPacketRecived += 0.01;
+				//std::cout<<"Increasing timeout, timeout at"<<_this->m_LastPacketRecived<<"\n";
 				if(_this->m_LastPacketRecived > _this->m_Timeout)
 				{
 					if(_this->m_pDisconnected)
@@ -170,7 +173,8 @@ namespace UDPX
 					_this->Disconnect();
 				}
 			}
-			Sleep(1);
+			delete Data;
+			Sleep(10);
 		}
 	}
 	void UDPXConnection::Init()
@@ -179,6 +183,7 @@ namespace UDPX
 		this->m_InitialSequence = 0;
 		this->m_KeepAlive = 0.0;
 		this->m_LastKeepAlive = 0.0;
+		this->m_LastPacketRecived = 0.0;
 		this->m_LastReceiveSequence = 0;
 		this->m_ReciveSequence = 0;
 		this->m_SendSequence = 0;
@@ -199,8 +204,8 @@ namespace UDPX
 	}
 	UDPXConnection::UDPXConnection(UDPXAddress* Address)
 	{
-		this->Init();
 		this->m_pAddress = Address;
+		this->Init();
 	}
 	void UDPXConnection::Send(BYTE* Data)
 	{
@@ -233,13 +238,14 @@ namespace UDPX
 	}
 	void UDPXConnection::SendKeepAlive()
 	{
-		BYTE* pdata = new byte[UDPX_PACKETHEADERSIZE];
+		BYTE* pdata = new BYTE[UDPX_PACKETHEADERSIZE];
 		pdata[0] = PacketType::KeepAlive;
 		_WriteInt(this->m_SendSequence - 1, pdata, 1);
 		_WriteInt(this->m_ReciveSequence, pdata, 5);
 		this->ResetKeepAlive();
 		this->SendRaw(pdata, UDPX_PACKETHEADERSIZE);
 		delete pdata;
+		std::cout<<"Sent KA\n";
 	}
 	void UDPXConnection::SetKeepAlive(double Time)
 	{
@@ -275,7 +281,7 @@ namespace UDPX
 	}
 	void UDPXConnection::SendRequest(int Sequence)
 	{
-		BYTE pdata[5];
+		BYTE* pdata = new BYTE[5];
 		pdata[0] = PacketType::Request;
 		_WriteInt(Sequence, pdata, 1);
 		this->SendRaw(pdata, 5);
@@ -296,6 +302,7 @@ namespace UDPX
 	void UDPXConnection::ResetKeepAlive()
 	{
 		this->m_LastKeepAlive = 0.0;
+		std::cout<<"Got KA\n";
 	}
 	void UDPXConnection::ProcessReciveNumber(int RS)
 	{
@@ -326,6 +333,7 @@ namespace UDPX
 					pdata[t] = Data[t + 1];
 				if(this->m_ReceivedPacket)
 					this->m_ReceivedPacket(this, false, pdata, Length -1);
+				delete pdata;
 				break;
 
 			case PacketType::Sequenced:
@@ -396,6 +404,7 @@ namespace UDPX
 
 					/// End C++ifide
 				}
+				delete pdata;
 			}break;
 
 			case PacketType::KeepAlive:
@@ -412,7 +421,8 @@ namespace UDPX
 					this->ProcessReciveNumber(rc);
 
 					// Request previous packets that are needed
-					for (int i = this->m_ReciveSequence; i <= sc; i++)
+					//for (int i = this->m_ReciveSequence; i <= sc; i++)
+					for (int i = this->m_ReciveSequence; i <= rc; i++)
 					{
 						if (!(this->m_RecivedPackets.count(i) > 0))
 							this->SendRequest(i);
@@ -432,6 +442,7 @@ namespace UDPX
 				{
 					BYTE* tosend = this->m_SentPackets.find(sc)->second;
 					this->SendWithSequence(sc, tosend, sizeof(tosend));
+					delete tosend;
 				}
 			}break;
 
@@ -454,7 +465,6 @@ namespace UDPX
 			}break;
 		}
 		this->m_LastPacketRecived = 0.0;
-		delete pdata;
 	}
 
 	void Listen(int Port, ConnectionHandelerFn connection)
@@ -505,9 +515,16 @@ namespace UDPX
 			{
 				std::cout<<"Checking handshake.\n";
 				BYTE packet[UDPX_MAXPACKETSIZE];
-				UDPXAddress* Sender;
+				UDPXAddress* Sender = new UDPXAddress();
 				int recived = s.Receive(Sender, packet, UDPX_MAXPACKETSIZE);
+				
 				if(recived == -1) break;
+				if(!Sender) break;
+
+				std::cout<<Sender->Address<<" in rec\n";
+				printf("%u in class\n", Sender->Address);
+				
+				
 				if(Sender->Address == Address->Address) // make sure it's from the correct person.
 				{
 					std::cout<<"Got Packet.\n";
@@ -516,7 +533,7 @@ namespace UDPX
 						std::cout<<"Got Handshake.\n";
 						int recsequence = _ReadInt(packet, 1);
 						UDPXConnection* connection = new UDPXConnection(Sender);
-						connection->m_ReciveSequence = recsequence;
+						connection->m_ReciveSequence = recsequence; // Crashed here.
 						OnConnect(connection);
 						PacketQueue* Node = FirstNode;
 						while(Node)
