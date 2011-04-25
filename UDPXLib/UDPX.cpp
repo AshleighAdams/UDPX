@@ -29,19 +29,19 @@ namespace UDPX
 {
 	// Private
 	void _WriteInt(int Val, BYTE* Data, int Offset)
-    {
-        Val = htonl(Val);
-        Data[Offset + 0] = (byte)Val;
-        Data[Offset + 1] = (byte)(Val >> 8);
-        Data[Offset + 2] = (byte)(Val >> 16);
-        Data[Offset + 3] = (byte)(Val >> 24);
-    }
+	{
+		Val = htonl(Val);
+		Data[Offset + 0] = (byte)Val;
+		Data[Offset + 1] = (byte)(Val >> 8);
+		Data[Offset + 2] = (byte)(Val >> 16);
+		Data[Offset + 3] = (byte)(Val >> 24);
+	}
 
 	int _ReadInt(BYTE* Data, int Offset)
-    {
-        int Int = (int)Data[Offset + 0] + ((int)Data[Offset + 1] << 8) + ((int)Data[Offset + 2] << 16) + ((int)Data[Offset + 3] << 24);
-        return ntohl(Int);
-    }
+	{
+		int Int = (int)Data[Offset + 0] + ((int)Data[Offset + 1] << 8) + ((int)Data[Offset + 2] << 16) + ((int)Data[Offset + 3] << 24);
+		return ntohl(Int);
+	}
 	
 	// Public
 	bool InitSockets()
@@ -240,10 +240,10 @@ namespace UDPX
 	{
 		BYTE* pdata = new byte[UDPX_PACKETHEADERSIZE];
 		pdata[0] = PacketType::KeepAlive;
-        _WriteInt(this->m_SendSequence - 1, pdata, 1);
-        _WriteInt(this->m_ReciveSequence, pdata, 5);
-        this->ResetKeepAlive();
-        this->SendRaw(pdata, UDPX_PACKETHEADERSIZE);
+		_WriteInt(this->m_SendSequence - 1, pdata, 1);
+		_WriteInt(this->m_ReciveSequence, pdata, 5);
+		this->ResetKeepAlive();
+		this->SendRaw(pdata, UDPX_PACKETHEADERSIZE);
 		delete pdata;
 	}
 	void UDPXConnection::SetKeepAlive(double Time)
@@ -282,20 +282,20 @@ namespace UDPX
 	{
 		BYTE pdata[5];
 		pdata[0] = PacketType::Request;
-        _WriteInt(Sequence, pdata, 1);
-        this->SendRaw(pdata, 5);
+		_WriteInt(Sequence, pdata, 1);
+		this->SendRaw(pdata, 5);
 		delete pdata;
 	}
 	void UDPXConnection::SendWithSequence(int Sequence, BYTE* Data, int Length)
 	{
 		BYTE* pdata = new BYTE[Length + UDPX_PACKETHEADERSIZE];
 		pdata[0] = PacketType::Sequenced;
-        _WriteInt(Sequence, pdata, 1);
-        _WriteInt(this->m_ReciveSequence, pdata, 5);
-        for (int t = 0; t < Length; t++)
-            pdata[t + UDPX_PACKETHEADERSIZE] = Data[t];
-        this->ResetKeepAlive();
-        this->SendRaw(pdata, Length + UDPX_PACKETHEADERSIZE);
+		_WriteInt(Sequence, pdata, 1);
+		_WriteInt(this->m_ReciveSequence, pdata, 5);
+		for (int t = 0; t < Length; t++)
+			pdata[t + UDPX_PACKETHEADERSIZE] = Data[t];
+		this->ResetKeepAlive();
+		this->SendRaw(pdata, Length + UDPX_PACKETHEADERSIZE);
 		delete pdata;
 	}
 	void UDPXConnection::ResetKeepAlive()
@@ -355,11 +355,11 @@ namespace UDPX
 					{
 						if (sc > this->m_LastReceiveSequence)
 							this->m_LastReceiveSequence = sc;
-	                    
+						
 						// Give receive callback
 						if (this->m_ReceivedPacket)
 							this->m_ReceivedPacket(this, true, pdata, (Length - UDPX_PACKETHEADERSIZE));
-	                    
+						
 						if (sc == this->m_ReciveSequence)
 						{
 							// Give ordered receive packet callback (and update receive numbers).
@@ -369,7 +369,7 @@ namespace UDPX
 								sc++;
 								if (this->m_ReceivedPacketOrderd)
 									this->m_ReceivedPacketOrderd(this, true, pdata, sizeof(pdata));
-	                            
+								
 								if(this->m_RecivedPackets.count(sc) > 0)
 								{
 									pdata = this->m_RecivedPackets.find(sc)->second;
@@ -390,7 +390,7 @@ namespace UDPX
 							}
 							else
 								this->m_RecivedPackets[sc] = NULL;
-	                        
+							
 						}
 
 						// Request all previous packets we need
@@ -429,7 +429,7 @@ namespace UDPX
 			{
 				if (Length < 5)
 					break;
-	            
+				
 				int sc = _ReadInt(Data, 1);
 
 				// Send out requested packet
