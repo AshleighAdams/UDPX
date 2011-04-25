@@ -57,29 +57,19 @@ namespace UDPX
 	
 	UDPXAddress::UDPXAddress()
 	{
-		m_Address = 0;
-		m_Port = 0;
+		Address = 0;
+		Port = 0;
 	}
-	UDPXAddress::UDPXAddress( unsigned int a, unsigned int b, unsigned int c, unsigned int d, unsigned short Port )
+	UDPXAddress::UDPXAddress( unsigned char a, unsigned char b, unsigned char c, unsigned char d, unsigned short Port )
 	{
-		m_Address = (a << 24) | (b << 16) | (c << 8) | d; // this is not network byte order
-		m_Port = Port;
+		Address = (a << 24) | (b << 16) | (c << 8) | d; // this is not network byte order
+		Port = Port;
 	}
 	UDPXAddress::UDPXAddress( unsigned int Address, unsigned short Port )
 	{
-		m_Address = Address;
-		m_Port = Port;
+		Address = Address;
+		Port = Port;
 	}
-	unsigned int UDPXAddress::GetAddress() const//technically an IP is an unsigned long
-	{
-		return m_Address;
-	}
-	unsigned short UDPXAddress::GetPort() const
-	{
-		return m_Port;
-	}
-
-
 
 	Socket::Socket()
 	{
@@ -114,8 +104,8 @@ namespace UDPX
 
 	bool Socket::Send(UDPXAddress* destination, const char* data, int size)
 	{
-		unsigned int dest_addr = destination->GetAddress();
-		unsigned short dest_port = destination->GetPort();
+		unsigned int dest_addr = destination->Address;
+		unsigned short dest_port = destination->Port;
 
 		sockaddr_in address;
 		address.sin_family = AF_INET;
@@ -145,7 +135,11 @@ namespace UDPX
 			WSAErr();
 			return -1;
 		}
-		sender = new UDPXAddress(pAddr.sin_addr.s_addr,pAddr.sin_port);//seeing as there are no set methods...
+		//pAddr.sin_addr.s_addr 
+		unsigned int test = (pAddr.sin_addr.S_un.S_un_b.s_b1 << 24) | (pAddr.sin_addr.S_un.S_un_b.s_b2 << 16) | (pAddr.sin_addr.S_un.S_un_b.s_b3 << 8) | pAddr.sin_addr.S_un.S_un_b.s_b4;
+		std::cout<<test<<" in rec\n";
+		sender = new UDPXAddress(test,pAddr.sin_port);//seeing as there are no set methods...
+		std::cout<<sender->Address<<"\n";
 		return received_bytes;
 	}
 	
@@ -157,7 +151,7 @@ namespace UDPX
 		{
 			UDPXAddress* Sender;
 			BYTE Data[UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE];
-			Recived = _this->m_pSocket->Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
+			Recived = _this->m_Socket.Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
 			if(Recived > 0)
 				_this->ReciveRaw(Data, Recived);
 			if(_this->m_KeepAlive > 0.0)
@@ -189,7 +183,8 @@ namespace UDPX
 		this->m_ReciveSequence = 0;
 		this->m_SendSequence = 0;
 		this->m_Timeout = 0.0;
-		this->m_pSocket = new Socket();
+		//this->m_pSocket = new Socket();
+		this->m_Socket.Open(this->m_pAddress->Port);
 		this->m_IncomingPacketThreadHandle = CreateThread(NULL, NULL, IncomingPacketThread, this, NULL, NULL);
 	}
 	UDPXConnection::UDPXConnection()
@@ -200,7 +195,7 @@ namespace UDPX
 	{
 		TerminateThread(this->m_IncomingPacketThreadHandle, 0);
 		delete this->m_pAddress;
-		delete this->m_pSocket;
+		//delete this->m_pSocket;
 	}
 	UDPXConnection::UDPXConnection(UDPXAddress* Address)
 	{
@@ -276,7 +271,7 @@ namespace UDPX
 	}
 	void UDPXConnection::SendRaw(BYTE* Data, int Length)
 	{
-		this->m_pSocket->Send(this->m_pAddress, (const char*)Data, Length);
+		this->m_Socket.Send(this->m_pAddress, (const char*)Data, Length);
 	}
 	void UDPXConnection::SendRequest(int Sequence)
 	{
@@ -485,7 +480,6 @@ namespace UDPX
 		ConnectThreadArugments* args = (ConnectThreadArugments*)arg;
 		UDPXAddress* Address = args->Address;
 		ConnectionHandelerFn OnConnect = args->ConnectionHandeler;
-		free(args); // we don't need you anymore
 
 		srand(time(NULL));
 		int startsequence = INT_MIN + rand();
@@ -496,6 +490,7 @@ namespace UDPX
 		
 		Socket s;
 		int Attempts = 5;
+		std::cout<<Attempts;
 		double Timeout = 1.0;
 
 		PacketQueue* FirstNode = NULL;
@@ -508,14 +503,17 @@ namespace UDPX
 			
 			while(true)
 			{
+				std::cout<<"Checking handshake.\n";
 				BYTE packet[UDPX_MAXPACKETSIZE];
 				UDPXAddress* Sender;
 				int recived = s.Receive(Sender, packet, UDPX_MAXPACKETSIZE);
 				if(recived == -1) break;
-				if(Sender->GetAddress() == Address->GetAddress() && Sender->GetPort() == Address->GetPort()) // make sure it's from the correct person.
+				if(Sender->Address == Address->Address) // make sure it's from the correct person.
 				{
+					std::cout<<"Got Packet.\n";
 					if(recived == 5 && packet[0] == PacketType::HandshakeAck)
 					{
+						std::cout<<"Got Handshake.\n";
 						int recsequence = _ReadInt(packet, 1);
 						UDPXConnection* connection = new UDPXConnection(Sender);
 						connection->m_ReciveSequence = recsequence;
@@ -562,6 +560,7 @@ namespace UDPX
 				free(LastNode);
 			}
 		}
+		std::cout<<"Connection timed out.\n";
 		OnConnect(NULL);
 		return 0;
 	}

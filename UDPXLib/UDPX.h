@@ -34,13 +34,10 @@ namespace UDPX
 	{
 	public:
 		UDPXAddress();
-		UDPXAddress( unsigned int a, unsigned int b, unsigned int c, unsigned int d, unsigned short Port );
+		UDPXAddress( unsigned char a, unsigned char b, unsigned char c, unsigned char d, unsigned short Port );
 		UDPXAddress( unsigned int Address, unsigned short Port );
-		unsigned int GetAddress() const;
-		unsigned short GetPort() const;
-	private:
-		unsigned int m_Address;
-		unsigned short m_Port;
+		unsigned int Address;
+		unsigned short Port;
 	};
 
 	
@@ -98,7 +95,7 @@ namespace UDPX
 		double				m_Timeout;
 		double				m_LastPacketRecived;
 		UDPXAddress*		m_pAddress;
-		Socket*				m_pSocket;
+		Socket				m_Socket;
 		int					m_InitialSequence;
 		int					m_ReciveSequence;
 		int					m_SendSequence;

@@ -51,7 +51,9 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	UDPX::InitSockets();
 	std::cout<<"Connectiong to localhost...\n";
-	Connect(new UDPXAddress(127,0,0,1,100), &ConnectionHandeler);
+	UDPXAddress* addr = new UDPXAddress(127,0,0,1,100);
+	std::cout<<addr->Address<<" @ main.cpp\n";
+	Connect(addr, &ConnectionHandeler);
 	
 	while(!Exit);
 	UDPX::UninitSockets();
