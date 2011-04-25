@@ -14,6 +14,19 @@ using namespace std;
 
 bool Exit = false;
 
+void __stdcall Disconnected(UDPXConnection* Connection, bool Explict)
+{
+	std::cout<<"Disconnected\n";
+	Exit = true;
+}
+
+void __stdcall RecivedPacket(UDPXConnection* Connection, bool Checked, BYTE* Data, int Length)
+{
+	for(int i = 0; i < Length; i++)
+		std::cout<<((char)Data[0]);
+	std::cout<<"\n";
+}
+
 void __stdcall ConnectionHandeler(UDPXConnection* Connection)
 {
 	if(!Connection)
@@ -23,12 +36,15 @@ void __stdcall ConnectionHandeler(UDPXConnection* Connection)
 		return;
 	}
 	std::cout<<"Connected to localhost\n";
-
-
-
-	Connection->Disconnect();
-	std::cout<<"Dissconnected from localhost\n";
-	Exit = false;
+	
+	Connection->SetTimeout(10.0);
+	Connection->SetKeepAlive(3.0);
+	
+	Connection->SetReceivedPacketEvent(&RecivedPacket);
+	Connection->SetDisconnectEvent(&Disconnected);
+	//Connection->Disconnect();
+	//std::cout<<"Dissconnected from localhost\n";
+	//Exit = true;
 }
 
 int _tmain(int argc, _TCHAR* argv[])

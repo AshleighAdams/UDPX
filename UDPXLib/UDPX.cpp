@@ -160,7 +160,22 @@ namespace UDPX
 			Recived = _this->m_pSocket->Receive(Sender, Data, UDPX_MAXPACKETSIZE + UDPX_PACKETHEADERSIZE);
 			if(Recived > 0)
 				_this->ReciveRaw(Data, Recived);
-			
+			if(_this->m_KeepAlive > 0.0)
+			{
+				_this->m_LastKeepAlive += 1.0 / 1000.0;
+				if(_this->m_LastKeepAlive > _this->m_KeepAlive) // Looks like we need to send another keep alive
+					_this->SendKeepAlive();
+			}
+			if(_this->m_Timeout > 0.0)
+			{
+				_this->m_LastPacketRecived += 1.0 / 1000.0;
+				if(_this->m_LastPacketRecived > _this->m_Timeout)
+				{
+					if(_this->m_pDisconnected)
+						_this->m_pDisconnected(_this, false);
+					_this->Disconnect();
+				}
+			}
 			Sleep(1);
 		}
 	}
@@ -285,7 +300,7 @@ namespace UDPX
 	}
 	void UDPXConnection::ResetKeepAlive()
 	{
-		
+		this->m_LastKeepAlive = 0.0;
 	}
 	void UDPXConnection::ProcessReciveNumber(int RS)
 	{
@@ -315,7 +330,7 @@ namespace UDPX
 				for (int t = 0; t < Length; t++)
 					pdata[t] = Data[t + 1];
 				if(this->m_ReceivedPacket)
-					this->m_ReceivedPacket(false, pdata, Length -1);
+					this->m_ReceivedPacket(this, false, pdata, Length -1);
 				break;
 
 			case PacketType::Sequenced:
@@ -343,7 +358,7 @@ namespace UDPX
 	                    
 						// Give receive callback
 						if (this->m_ReceivedPacket)
-							this->m_ReceivedPacket(true, pdata, (Length - UDPX_PACKETHEADERSIZE));
+							this->m_ReceivedPacket(this, true, pdata, (Length - UDPX_PACKETHEADERSIZE));
 	                    
 						if (sc == this->m_ReciveSequence)
 						{
@@ -353,7 +368,7 @@ namespace UDPX
 								this->m_ReciveSequence++;
 								sc++;
 								if (this->m_ReceivedPacketOrderd)
-									this->m_ReceivedPacketOrderd(true, pdata, sizeof(pdata));
+									this->m_ReceivedPacketOrderd(this, true, pdata, sizeof(pdata));
 	                            
 								if(this->m_RecivedPackets.count(sc) > 0)
 								{
@@ -437,12 +452,13 @@ namespace UDPX
 				if (this->ValidPacket(sc, rc))
 				{
 					if (this->m_pDisconnected)
-						this->m_pDisconnected(true);
+						this->m_pDisconnected(this, true);
 					delete this; // We don't need ourself anymore
 				}
 				break;
 			}break;
 		}
+		this->m_LastPacketRecived = 0.0;
 		delete pdata;
 	}
 

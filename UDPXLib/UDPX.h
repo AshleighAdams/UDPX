@@ -14,6 +14,8 @@ using std::map;
 #define UDPX_SEQUENCEWINDOW (100)
 namespace UDPX
 {
+	class UDPXConnection; // This is just for the typedef
+
 	enum PacketType : BYTE
     {
         Sequenced,
@@ -41,9 +43,10 @@ namespace UDPX
 		unsigned short m_Port;
 	};
 
-	typedef void (__stdcall *DisconnectedFn)(bool Explict);
-	typedef void (__stdcall *ReceivedPacketFn)(bool Checked, BYTE* Data, int Length);
 	
+	typedef void (__stdcall *DisconnectedFn)(UDPXConnection* Connection, bool Explict);
+	typedef void (__stdcall *ReceivedPacketFn)(UDPXConnection* Connection, bool Checked, BYTE* Data, int Length);
+
 	class Socket
 	{
 	public:
@@ -93,6 +96,7 @@ namespace UDPX
 		double				m_KeepAlive;
 		double				m_LastKeepAlive;
 		double				m_Timeout;
+		double				m_LastPacketRecived;
 		UDPXAddress*		m_pAddress;
 		Socket*				m_pSocket;
 		int					m_InitialSequence;
