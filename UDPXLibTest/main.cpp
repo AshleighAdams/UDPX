@@ -51,7 +51,7 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	UDPX::InitSockets();
 	std::cout<<"Connectiong to localhost...\n";
-	UDPXAddress* addr = new UDPXAddress(127,0,0,1,(unsigned int)100);
+	UDPXAddress* addr = new UDPXAddress(127,0,0,1,(unsigned short)100);
 	addr->Port = 100;
 	printf("%i - %i\n", addr->Address, addr->Port);
 	std::cout<<addr->Address<<" - "<<addr->Port<<"\n";

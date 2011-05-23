@@ -221,8 +221,9 @@ namespace UDPX
 		int Length = sizeof(Data);
 		BYTE* pdata = new BYTE[Length + 1];
 		pdata[0] = PacketType::Unsequenced;
-		for (int t = 0; t < Length; t++)
-			pdata[t + 1] = Data[t];
+		memccpy(pdata, Data, 1, Length);
+		//for (int t = 0; t < Length; t++)		// TODO: Use memcpy
+		//	pdata[t + 1] = Data[t];
 		this->ResetKeepAlive();
 		this->SendRaw(pdata, Length+1);
 	}
